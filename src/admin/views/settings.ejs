@@ -1,0 +1,108 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Settings</h2>
+</div>
+
+<% if (error) { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <%= error %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<% } %>
+
+<% if (success) { %>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <%= success %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<% } %>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user-cog"></i> Зміна даних адміністратора
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="adminForm" method="POST" action="/admin/settings/admin">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Ім'я користувача</label>
+                        <input type="text" class="form-control" id="username" name="username" 
+                               value="<%= currentAdmin.username %>" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="currentPassword" class="form-label">Поточний пароль</label>
+                        <input type="password" class="form-control" id="currentPassword" 
+                               name="currentPassword" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="newPassword" class="form-label">Новий пароль</label>
+                        <input type="password" class="form-control" id="newPassword" 
+                               name="newPassword" minlength="6">
+                        <div class="form-text">Залиште порожнім, якщо не хочете змінювати пароль</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="confirmPassword" class="form-label">Підтвердження нового пароля</label>
+                        <input type="password" class="form-control" id="confirmPassword" 
+                               name="confirmPassword">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Зберегти зміни
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cog"></i> Системні налаштування
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="systemForm" method="POST" action="/admin/settings/system">
+                    <div class="mb-3">
+                        <label for="siteName" class="form-label">Назва сайту</label>
+                        <input type="text" class="form-control" id="siteName" name="siteName" 
+                               value="<%= settings.siteName || 'Vidoma E-commerce' %>">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="contactEmail" class="form-label">Email для зв'язку</label>
+                        <input type="email" class="form-control" id="contactEmail" name="contactEmail" 
+                               value="<%= settings.contactEmail || '' %>">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="phoneNumber" class="form-label">Номер телефону</label>
+                        <input type="tel" class="form-control" id="phoneNumber" name="phoneNumber" 
+                               value="<%= settings.phoneNumber || '' %>">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="maintenanceMode" 
+                                   name="maintenanceMode" <%= settings.maintenanceMode ? 'checked' : '' %>>
+                            <label class="form-check-label" for="maintenanceMode">
+                                Режим технічного обслуговування
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Зберегти налаштування
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/js/admin/settings.js"></script>
