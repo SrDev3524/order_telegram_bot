@@ -1,0 +1,16 @@
+services:
+- type: web
+  name: vidoma-bot
+  env: node
+  plan: free
+  buildCommand: npm install --legacy-peer-deps && npm run build
+  startCommand: npm start
+  envVars:
+  - key: NODE_ENV
+    value: production
+  - key: NODE_OPTIONS
+    value: --max-old-space-size=512
+  autoDeploy: false
+  healthCheckPath: /health
+  domains:
+  - vidoma-bot.onrender.com

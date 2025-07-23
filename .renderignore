@@ -1,0 +1,15 @@
+# Render deployment ignore file
+.env
+.env.local
+.env.development
+.env.test
+data/database.sqlite*
+node_modules/
+.git/
+*.log
+coverage/
+.nyc_output/
+test/
+tests/
+*.test.js
+*.spec.js
