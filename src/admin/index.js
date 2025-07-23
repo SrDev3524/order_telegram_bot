@@ -37,4 +37,4 @@ app.get('/', (req, res) => {
     res.redirect('/auth/login')
   }
 })
-app.listen(3001, () => console.log('Admin panel running on http://localhost:3001'))
+app.listen(80, () => console.log('Admin panel running on http://localhost:80'))
