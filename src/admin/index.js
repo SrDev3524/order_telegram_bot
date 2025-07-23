@@ -1,7 +1,6 @@
 const express = require('express')
 const session = require('express-session')
 const path = require('path')
-const multer = require('multer')
 const expressLayouts = require('express-ejs-layouts')
 const methodOverride = require('method-override')
 const app = express()

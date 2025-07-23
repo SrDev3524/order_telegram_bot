@@ -22,8 +22,8 @@ const storage = multer.diskStorage({
   }
 })
 
-const upload = multer({ 
-  storage: storage,
+const upload = multer({
+  storage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -35,10 +35,10 @@ const upload = multer({
 })
 
 // GET - Display products page
-router.get('/', async (req, res) => {
+router.get('/', async(req, res) => {
   try {
     await db.connect()
-    
+
     const [products, categories] = await Promise.all([
       db.all(`
         SELECT 
@@ -51,7 +51,7 @@ router.get('/', async (req, res) => {
       `),
       db.all('SELECT * FROM categories WHERE active = 1 ORDER BY name')
     ])
-    
+
     res.render('products', {
       title: 'Product Management',
       currentPage: 'products',
@@ -61,7 +61,6 @@ router.get('/', async (req, res) => {
       error: req.query.error || null,
       success: req.query.success || null
     })
-    
   } catch (error) {
     console.error('Error loading products page:', error)
     res.render('products', {
@@ -76,19 +75,19 @@ router.get('/', async (req, res) => {
   }
 })
 
-router.get('/api/:id', async (req, res) => {
+router.get('/api/:id', async(req, res) => {
   try {
     await db.connect()
-    
+
     const product = await db.get(
       'SELECT * FROM products WHERE id = ?',
       [req.params.id]
     )
-    
+
     if (!product) {
       return res.status(404).json({ error: 'Product not found' })
     }
-    
+
     res.json(product)
   } catch (error) {
     console.error('Error fetching product:', error)
@@ -96,17 +95,17 @@ router.get('/api/:id', async (req, res) => {
   }
 })
 
-router.post('/', upload.array('images', 5), async (req, res) => {
+router.post('/', upload.array('images', 5), async(req, res) => {
   try {
     await db.connect()
-    
+
     const { name, description, sku, price, sale_price, stock_quantity, category_id, active } = req.body
     const images = req.files ? req.files.map(file => `/uploads/products/${file.filename}`) : []
-    
+
     if (!name || !price || !category_id) {
       return res.redirect('/admin/products?error=' + encodeURIComponent('Name, price and category are required'))
     }
-    
+
     const result = await db.run(`
       INSERT INTO products (name, description, sku, price, sale_price, stock_quantity, category_id, active, images)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -121,7 +120,7 @@ router.post('/', upload.array('images', 5), async (req, res) => {
       active === 'on' ? 1 : 0,
       JSON.stringify(images)
     ])
-    
+
     if (result && result.lastID) {
       res.redirect('/admin/products?success=' + encodeURIComponent('Product created successfully'))
     } else {
@@ -133,28 +132,28 @@ router.post('/', upload.array('images', 5), async (req, res) => {
   }
 })
 
-router.put('/:id', upload.array('images', 5), async (req, res) => {
+router.put('/:id', upload.array('images', 5), async(req, res) => {
   try {
     await db.connect()
-    
+
     const productId = req.params.id
     const { name, description, sku, price, sale_price, stock_quantity, category_id, active } = req.body
-    
+
     if (!name || !price || !category_id) {
       return res.status(400).json({ error: 'Name, price and category are required' })
     }
-    
+
     const existingProduct = await db.get('SELECT * FROM products WHERE id = ?', [productId])
     if (!existingProduct) {
       return res.status(404).json({ error: 'Product not found' })
     }
-    
+
     let updateQuery = `
       UPDATE products 
       SET name = ?, description = ?, sku = ?, price = ?, sale_price = ?, 
           stock_quantity = ?, category_id = ?, active = ?, updated_at = datetime('now')
     `
-    let queryParams = [
+    const queryParams = [
       name.trim(),
       description ? description.trim() : null,
       sku ? sku.trim() : null,
@@ -164,18 +163,18 @@ router.put('/:id', upload.array('images', 5), async (req, res) => {
       parseInt(category_id),
       active === 'on' || active === '1' ? 1 : 0
     ]
-    
+
     if (req.files && req.files.length > 0) {
       const newImages = req.files.map(file => `/uploads/products/${file.filename}`)
       updateQuery += ', images = ?'
       queryParams.push(JSON.stringify(newImages))
     }
-    
+
     updateQuery += ' WHERE id = ?'
     queryParams.push(productId)
-    
+
     const result = await db.run(updateQuery, queryParams)
-    
+
     if (result.changes > 0) {
       res.json({ message: 'Product updated successfully' })
     } else {
@@ -187,17 +186,17 @@ router.put('/:id', upload.array('images', 5), async (req, res) => {
   }
 })
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async(req, res) => {
   try {
     await db.connect()
-    
+
     const product = await db.get('SELECT * FROM products WHERE id = ?', [req.params.id])
     if (!product) {
       return res.status(404).json({ error: 'Product not found' })
     }
-    
+
     const result = await db.run('DELETE FROM products WHERE id = ?', [req.params.id])
-    
+
     if (result.changes > 0) {
       res.json({ message: 'Product deleted successfully' })
     } else {
