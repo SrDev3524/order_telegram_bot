@@ -34,7 +34,7 @@ async function startServer() {
     await bot.launch()
     console.log('Bot started successfully!')
     
-    console.log('Admin panel running on http://localhost:3001')
+    console.log('Admin panel running on http://localhost:80')
     console.log('🎉 Server started successfully!')
     
   } catch (error) {
