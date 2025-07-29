@@ -14,7 +14,7 @@ const messages = {
 
 function setupProductHandlers(bot) {
   // Handle "Browse Products" button
-  bot.hears('🛍 Browse Products', async (ctx) => {
+  bot.hears('🛍 Browse Products', async(ctx) => {
     try {
       const categories = await db.all(`
         SELECT id, name, description 
@@ -50,7 +50,7 @@ function setupProductHandlers(bot) {
   })
 
   // Category selection
-  bot.action(/category_(\d+)/, async (ctx) => {
+  bot.action(/category_(\d+)/, async(ctx) => {
     const categoryId = parseInt(ctx.match[1])
 
     try {
@@ -103,7 +103,7 @@ function setupProductHandlers(bot) {
   })
 
   // Product details
-  bot.action(/product_(\d+)/, async (ctx) => {
+  bot.action(/product_(\d+)/, async(ctx) => {
     const productId = parseInt(ctx.match[1])
 
     try {
@@ -178,10 +178,10 @@ function setupProductHandlers(bot) {
   })
 
   // Size Help
-  bot.action(/size_help_(\d+)/, async (ctx) => {
+  bot.action(/size_help_(\d+)/, async(ctx) => {
     await ctx.answerCbQuery()
     const productId = parseInt(ctx.match[1])
-    
+
     const sizeGuide = `📏 Довідка по розмірах
 
 Я допоможу вам обрати правильний розмір.
@@ -212,10 +212,10 @@ XXL - грудь: 102-106 см, талія: 82-86 см`
   })
 
   // Back to product from size help
-  bot.action(/back_to_product_(\d+)/, async (ctx) => {
+  bot.action(/back_to_product_(\d+)/, async(ctx) => {
     await ctx.answerCbQuery()
     const productId = parseInt(ctx.match[1])
-    
+
     // Redirect to product details without modifying navigation stack
     try {
       const product = await db.get(`
@@ -286,7 +286,7 @@ XXL - грудь: 102-106 см, талія: 82-86 см`
   })
 
   // Back navigation
-  bot.action('back', async (ctx) => {
+  bot.action('back', async(ctx) => {
     if (!ctx.session.navigationStack || ctx.session.navigationStack.length <= 1) {
       return
     }
@@ -357,7 +357,7 @@ XXL - грудь: 102-106 см, талія: 82-86 см`
   })
 
   // Order handler - Start order wizard
-  bot.action(/order_(\d+)/, async (ctx) => {
+  bot.action(/order_(\d+)/, async(ctx) => {
     const productId = parseInt(ctx.match[1])
     await ctx.answerCbQuery()
 
@@ -366,9 +366,17 @@ XXL - грудь: 102-106 см, талія: 82-86 см`
   })
 
   // Return to main menu
-  bot.action('main_menu', async (ctx) => {
+  bot.action('main_menu', async(ctx) => {
+    await ctx.answerCbQuery()
     await ctx.deleteMessage()
     ctx.session.navigationStack = [{ type: 'main_menu' }]
+
+    // Show main menu
+    const mainKeyboard = require('../keyboards/mainKeyboard')
+    await ctx.reply(
+      '🏠 Головне меню\n\nОберіть потрібний розділ:',
+      mainKeyboard()
+    )
   })
 }
 

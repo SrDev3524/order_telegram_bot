@@ -33,7 +33,7 @@ function initializeBot(bot) {
             ctx.from.first_name || null,
             ctx.from.last_name || null
           ])
-          
+
           // Get the newly created user with ID
           ctx.user = await db.get(
             'SELECT * FROM users WHERE telegram_id = ?',

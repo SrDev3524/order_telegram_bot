@@ -14,15 +14,17 @@ class NovaPoshtaService {
         modelName: 'Address',
         calledMethod: 'getCities',
         methodProperties: {
-          FindByString: cityName
+          FindByString: cityName,
+          Language: 'UA' // Force Ukrainian language
         }
       })
 
       if (response.data.success) {
         return response.data.data.map(city => ({
-          name: city.Description,
-          area: city.Area,
-          region: city.Region,
+          name: city.DescriptionUa || city.Description,
+          nameRu: city.DescriptionRu,
+          area: city.AreaDescriptionUa || city.AreaDescription || city.Area,
+          region: city.RegionDescriptionUa || city.RegionsDescription || city.Region,
           ref: city.Ref
         }))
       }
@@ -42,15 +44,16 @@ class NovaPoshtaService {
         modelName: 'AddressGeneral',
         calledMethod: 'getWarehouses',
         methodProperties: {
-          CityRef: cityRef
+          CityRef: cityRef,
+          Language: 'UA' // Force Ukrainian language
         }
       })
 
       if (response.data.success) {
         return response.data.data.map(warehouse => ({
           number: warehouse.Number,
-          description: warehouse.Description,
-          address: warehouse.ShortAddress,
+          description: warehouse.DescriptionUa || warehouse.Description,
+          address: warehouse.ShortAddressUa || warehouse.ShortAddress,
           ref: warehouse.Ref,
           siteKey: warehouse.SiteKey,
           typeOfWarehouse: warehouse.TypeOfWarehouse
@@ -115,7 +118,7 @@ class NovaPoshtaService {
 
     // Limit to first 8 cities to avoid keyboard size issues
     const limitedCities = cities.slice(0, 8)
-    
+
     return {
       reply_markup: {
         inline_keyboard: [
@@ -169,16 +172,17 @@ class NovaPoshtaService {
   // Prepare Nova Poshta data for CRM
   prepareForCRM(cityData, warehouseData) {
     return {
-      ServiceType: 'Warehouse',
+      ServiceType: 'WarehouseWarehouse',
       payer: 'recipient',
-      area: cityData.area,
-      region: cityData.region,
+      area: cityData.area || '',
+      region: cityData.region || '',
       city: cityData.name,
-      WarehouseNumber: warehouseData.number,
-      // Add fields that CRM expects
       cityNameFormat: 'full',
-      cityRef: cityData.ref,
-      warehouseRef: warehouseData.ref
+      WarehouseNumber: warehouseData.ref || warehouseData.number, // Use ref as per SalesDrive docs
+      Street: '',
+      BuildingNumber: '',
+      Flat: '',
+      ttn: ''
     }
   }
 
@@ -188,22 +192,22 @@ class NovaPoshtaService {
       return '❌ Інформація про відправлення не знайдена.'
     }
 
-    let result = `📦 Статус доставки\n\n`
+    let result = '📦 Статус доставки\n\n'
     result += `📮 ТТН: ${trackData.number}\n`
     result += `📋 Статус: ${trackData.status}\n`
-    
+
     if (trackData.warehouseSender) {
       result += `📍 Відправлення: ${trackData.warehouseSender}\n`
     }
-    
+
     if (trackData.warehouseRecipient) {
       result += `📍 Отримання: ${trackData.warehouseRecipient}\n`
     }
-    
+
     if (trackData.dateCreated) {
       result += `📅 Дата створення: ${new Date(trackData.dateCreated).toLocaleDateString('uk-UA')}\n`
     }
-    
+
     if (trackData.scheduledDeliveryDate) {
       result += `🚚 Очікувана доставка: ${new Date(trackData.scheduledDeliveryDate).toLocaleDateString('uk-UA')}\n`
     }

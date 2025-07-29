@@ -3,7 +3,7 @@ const { Telegram } = require('telegraf')
 
 // Admin bot for forwarding messages
 const ADMIN_BOT_TOKEN = process.env.ADMIN_BOT_TOKEN
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID 
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID
 function setupSupportHandlers(bot) {
   // Initialize admin bot if token is provided
   let adminBot = null
@@ -16,7 +16,7 @@ function setupSupportHandlers(bot) {
   }
 
   // Handle "Manager" button - show contact info only
-  bot.hears('💬 Manager', async (ctx) => {
+  bot.hears('💬 Manager', async(ctx) => {
     const contactInfo = `💬 Зв'язок з менеджером
 
 📞 Телефон: +38 (095) 412-61-00
@@ -34,7 +34,6 @@ function setupSupportHandlers(bot) {
 
     await ctx.reply(contactInfo)
   })
-
 }
 
 module.exports = { setupSupportHandlers }

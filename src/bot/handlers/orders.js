@@ -3,9 +3,9 @@ const axios = require('axios')
 
 function setupOrderHandlers(bot) {
   // Handle "Order Status" button
-  bot.hears('📦 Order Status', async (ctx) => {
+  bot.hears('📦 Order Status', async(ctx) => {
     ctx.session.orderTracking = true
-    
+
     await ctx.reply(
       '📦 Відстеження замовлення\n\n' +
       'Введіть номер ТТН або номер телефону для перевірки статусу доставки:',
@@ -21,7 +21,7 @@ function setupOrderHandlers(bot) {
   })
 
   // My orders list
-  bot.action('my_orders', async (ctx) => {
+  bot.action('my_orders', async(ctx) => {
     try {
       const orders = await db.all(`
         SELECT o.*, 
@@ -86,19 +86,19 @@ function setupOrderHandlers(bot) {
   })
 
   // Cancel tracking
-  bot.action('cancel_tracking', async (ctx) => {
+  bot.action('cancel_tracking', async(ctx) => {
     ctx.session.orderTracking = false
     await ctx.deleteMessage()
   })
 
   // Handle TTN tracking input
-  bot.on('text', async (ctx, next) => {
+  bot.on('text', async(ctx, next) => {
     if (!ctx.session.orderTracking) {
       return next()
     }
 
     const input = ctx.message.text.trim()
-    
+
     // Check if it's TTN (20 digits) or phone number
     const isTTN = /^\d{14}$/.test(input)
     const isPhone = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{4,6}$/.test(input)
@@ -151,10 +151,10 @@ function setupOrderHandlers(bot) {
 // Track by TTN using Nova Poshta API
 async function trackByTTN(ttn) {
   const apiKey = process.env.NOVA_POSHTA_API_KEY || '8f3a0fe9f223565adf6a4d6003b92e21'
-  
+
   try {
     const response = await axios.post('https://api.novaposhta.ua/v2.0/json/', {
-      apiKey: apiKey,
+      apiKey,
       modelName: 'TrackingDocument',
       calledMethod: 'getStatusDocuments',
       methodProperties: {
@@ -178,22 +178,22 @@ function formatTrackingInfo(data) {
     return '❌ Інформація про відправлення не знайдена.'
   }
 
-  let result = `📦 Статус доставки\n\n`
+  let result = '📦 Статус доставки\n\n'
   result += `📮 ТТН: ${data.Number}\n`
   result += `📋 Статус: ${data.Status}\n`
-  
+
   if (data.WarehouseSender) {
     result += `📍 Відправлення: ${data.WarehouseSender}\n`
   }
-  
+
   if (data.WarehouseRecipient) {
     result += `📍 Отримання: ${data.WarehouseRecipient}\n`
   }
-  
+
   if (data.DateCreated) {
     result += `📅 Дата створення: ${new Date(data.DateCreated).toLocaleDateString('uk-UA')}\n`
   }
-  
+
   if (data.ScheduledDeliveryDate) {
     result += `🚚 Очікувана доставка: ${new Date(data.ScheduledDeliveryDate).toLocaleDateString('uk-UA')}\n`
   }

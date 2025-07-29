@@ -3,29 +3,64 @@ const db = require('../../database/connection')
 const crmService = require('../../services/crm')
 const novaPoshtaService = require('../../services/novaPoshta')
 
+// Helper function to clear all timeouts
+const clearAllTimeouts = (ctx) => {
+  if (ctx.scene.state.timeoutId) {
+    clearTimeout(ctx.scene.state.timeoutId)
+    ctx.scene.state.timeoutId = null
+  }
+}
+
+// Helper function to set timeout
+const setOrderTimeout = (ctx) => {
+  // Clear any existing timeout first
+  clearAllTimeouts(ctx)
+
+  const timeoutId = setTimeout(() => {
+    // Clear the timeout immediately to prevent repeated messages
+    clearAllTimeouts(ctx)
+
+    ctx.reply(
+      '⏱️ Час очікування вичерпано. Замовлення скасовано.\n\n' +
+      'Щоб розпочати нове замовлення, використайте /start',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('🏠 Головне меню', 'main_menu')]
+      ])
+    )
+    ctx.scene.leave()
+  }, 300000) // 5 minutes
+
+  ctx.scene.state.timeoutId = timeoutId
+}
+
 const orderWizard = new Scenes.WizardScene(
   'order-wizard',
 
-  // Step 1: Customer name
+  // Step 1: Customer first name
   async(ctx) => {
     console.log('=== ORDER WIZARD STEP 1 ===')
     console.log('ctx.scene.state:', ctx.scene.state)
     console.log('ctx.session.__scenes.state:', ctx.session.__scenes?.state)
-    
+
+    // Set timeout for the order process
+    setOrderTimeout(ctx)
+
     // Get productId from scene entry state
     const productId = ctx.scene.state.productId
     console.log('Product ID from scene state:', productId)
-    
+
     if (!productId) {
       console.log('No productId found, exiting scene')
+      clearAllTimeouts(ctx)
       await ctx.reply('❌ Помилка: не вказано товар.')
       return ctx.scene.leave()
     }
-    
+
     const product = await db.get('SELECT * FROM products WHERE id = ?', [productId])
     console.log('Product found:', product)
 
     if (!product) {
+      clearAllTimeouts(ctx)
       await ctx.reply('❌ Товар не знайдено.')
       return ctx.scene.leave()
     }
@@ -33,7 +68,7 @@ const orderWizard = new Scenes.WizardScene(
     ctx.scene.state.product = product
 
     await ctx.reply(
-      `🛒 Оформлення замовлення\n\n📦 Товар: ${product.name}\n💰 Ціна: ${product.sale_price || product.price}₴\n\n👤 Введіть ваше ім'я:`,
+      `🛒 Оформлення замовлення\n\n📦 Товар: ${product.name}\n💰 Ціна: ${product.sale_price || product.price}₴\n\n👤 Введіть ваше ім'я (Ім'я):`,
       Markup.inlineKeyboard([
         [Markup.button.callback('❌ Скасувати', 'cancel_order')]
       ])
@@ -42,14 +77,40 @@ const orderWizard = new Scenes.WizardScene(
     return ctx.wizard.next()
   },
 
-  // Step 2: Phone number
+  // Step 2: Customer last name
   async(ctx) => {
+    // Reset timeout on user activity
+    setOrderTimeout(ctx)
+
     if (!ctx.message?.text) {
       await ctx.reply('❌ Будь ласка, введіть ваше ім\'я текстом.')
       return
     }
 
-    ctx.scene.state.customerName = ctx.message.text.trim()
+    ctx.scene.state.customerFirstName = ctx.message.text.trim()
+
+    await ctx.reply(
+      '👤 Введіть ваше прізвище (Прізвище):',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('❌ Скасувати', 'cancel_order')]
+      ])
+    )
+
+    return ctx.wizard.next()
+  },
+
+  // Step 3: Phone number
+  async(ctx) => {
+    // Reset timeout on user activity
+    setOrderTimeout(ctx)
+
+    if (!ctx.message?.text) {
+      await ctx.reply('❌ Будь ласка, введіть ваше прізвище текстом.')
+      return
+    }
+
+    ctx.scene.state.customerLastName = ctx.message.text.trim()
+    ctx.scene.state.customerName = `${ctx.scene.state.customerFirstName} ${ctx.scene.state.customerLastName}`
 
     await ctx.reply(
       '📱 Введіть ваш номер телефону:\n(наприклад: +380501234567)',
@@ -61,8 +122,11 @@ const orderWizard = new Scenes.WizardScene(
     return ctx.wizard.next()
   },
 
-  // Step 3: Size selection
+  // Step 4: Size selection
   async(ctx) => {
+    // Reset timeout on user activity
+    setOrderTimeout(ctx)
+
     if (!ctx.message?.text) {
       await ctx.reply('❌ Будь ласка, введіть номер телефону.')
       return
@@ -90,8 +154,11 @@ const orderWizard = new Scenes.WizardScene(
     return ctx.wizard.next()
   },
 
-  // Step 4: Delivery method
+  // Step 5: Delivery method
   async(ctx) => {
+    // Reset timeout on user activity
+    setOrderTimeout(ctx)
+
     const sizes = {
       size_xs: 'XS',
       size_s: 'S',
@@ -103,6 +170,8 @@ const orderWizard = new Scenes.WizardScene(
 
     if (ctx.callbackQuery?.data === 'size_guide') {
       await ctx.answerCbQuery()
+      // Reset timeout on size guide view
+      setOrderTimeout(ctx)
       await ctx.editMessageText(
         '📖 Довідка по розмірах\n\n' +
         'XS - обхват грудей: 82-86 см\n' +
@@ -144,30 +213,58 @@ const orderWizard = new Scenes.WizardScene(
     return ctx.wizard.next()
   },
 
-  // Step 5: Nova Poshta city input (delivery method is already set)
+  // Step 6: Nova Poshta city input (delivery method is already set)
   async(ctx) => {
     // This step is now just for handling city input since delivery method is fixed to Nova Poshta
     return ctx.wizard.next()
   },
 
-  // Step 6: Handle Nova Poshta city search and selection
+  // Step 7: Handle Nova Poshta city search and selection
   async(ctx) => {
+    // Reset timeout on user activity
+    if (ctx.message || ctx.callbackQuery) {
+      setOrderTimeout(ctx)
+    }
+
+    // Handle change city request in step 7
+    if (ctx.callbackQuery?.data === 'change_city') {
+      await ctx.answerCbQuery()
+      ctx.scene.state.waitingForCity = true
+      ctx.scene.state.selectedCity = null
+      ctx.scene.state.availableWarehouses = null
+      ctx.scene.state.selectedWarehouse = null
+
+      await ctx.editMessageText(
+        '🏙️ Введіть назву вашого міста для доставки Нова Пошта:\n\n' +
+        '💡 Підказка: використовуйте українську мову\n' +
+        'Наприклад: Київ, Харків, Львів, Одеса',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('❌ Скасувати', 'cancel_order')]
+        ])
+      )
+      return
+    }
+
     // Handle city input for Nova Poshta
     if (ctx.scene.state.waitingForCity && ctx.message?.text) {
       const cityName = ctx.message.text.trim()
-      
+
       await ctx.reply('🔍 Шукаємо ваше місто...')
-      
+
       try {
         const cities = await novaPoshtaService.searchCities(cityName)
-        
+
         if (cities.length === 0) {
           await ctx.reply(
-            '❌ Місто не знайдено. Спробуйте ще раз або введіть назву українською мовою:',
+            `❌ Місто "${cityName}" не знайдено.\n\n` +
+            '💡 Підказка: Введіть назву міста українською мовою.\n' +
+            'Наприклад: Київ, Харків, Львів, Одеса\n\n' +
+            'Спробуйте ще раз:',
             Markup.inlineKeyboard([
-              [Markup.button.callback('❌ Скасувати', 'cancel_order')]
+              [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
             ])
           )
+          // Stay in the same step to allow retry
           return
         }
 
@@ -175,27 +272,34 @@ const orderWizard = new Scenes.WizardScene(
           // Only one city found, proceed to warehouses
           ctx.scene.state.selectedCity = cities[0]
           ctx.scene.state.waitingForCity = false
-          
+
           await ctx.reply('📦 Завантажуємо список відділень...')
           const warehouses = await novaPoshtaService.getWarehouses(cities[0].ref)
-          
+
           if (warehouses.length === 0) {
-            await ctx.reply('❌ У цьому місті немає відділень Нова Пошта.')
+            await ctx.reply(
+              '❌ У цьому місті немає відділень Нова Пошта.\n\n' +
+              'Спробуйте інше місто:',
+              Markup.inlineKeyboard([
+                [Markup.button.callback('⬅ Змінити місто', 'change_city')],
+                [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+              ])
+            )
             return
           }
 
           ctx.scene.state.availableWarehouses = warehouses
-          
+
           await ctx.reply(
             `📦 Оберіть відділення Нова Пошта у місті ${cities[0].name}:`,
             novaPoshtaService.formatWarehousesForKeyboard(warehouses)
           )
-          
+
           return ctx.wizard.next()
         } else {
           // Multiple cities found, show selection
           ctx.scene.state.availableCities = cities
-          
+
           await ctx.reply(
             '🏙️ Знайдено кілька міст з такою назвою. Оберіть потрібне:',
             novaPoshtaService.formatCitiesForKeyboard(cities)
@@ -204,7 +308,16 @@ const orderWizard = new Scenes.WizardScene(
         }
       } catch (error) {
         console.error('Nova Poshta search error:', error)
-        await ctx.reply('❌ Помилка пошуку міста. Спробуйте ще раз.')
+        await ctx.reply(
+          '❌ Помилка при пошуку міста. Можливі причини:\n\n' +
+          '• Проблеми з підключенням до Нової Пошти\n' +
+          '• Неправильно введена назва міста\n\n' +
+          'Спробуйте ще раз або зверніться до підтримки.',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Спробувати ще раз', 'retry_city')],
+            [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+          ])
+        )
         return
       }
     }
@@ -213,7 +326,7 @@ const orderWizard = new Scenes.WizardScene(
     if (ctx.callbackQuery?.data?.startsWith('city_')) {
       const cityRef = ctx.callbackQuery.data.replace('city_', '')
       const selectedCity = ctx.scene.state.availableCities?.find(city => city.ref === cityRef)
-      
+
       if (!selectedCity) {
         await ctx.answerCbQuery('❌ Помилка вибору міста')
         return
@@ -224,42 +337,80 @@ const orderWizard = new Scenes.WizardScene(
       await ctx.answerCbQuery()
 
       await ctx.editMessageText('📦 Завантажуємо список відділень...')
-      
+
       try {
         const warehouses = await novaPoshtaService.getWarehouses(selectedCity.ref)
-        
+
         if (warehouses.length === 0) {
-          await ctx.editMessageText('❌ У цьому місті немає відділень Нова Пошта.')
+          await ctx.editMessageText(
+            '❌ У цьому місті немає відділень Нова Пошта.\n\n' +
+            'Спробуйте інше місто:',
+            Markup.inlineKeyboard([
+              [Markup.button.callback('⬅ Змінити місто', 'change_city')],
+              [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+            ])
+          )
           return
         }
 
         ctx.scene.state.availableWarehouses = warehouses
-        
+
         await ctx.editMessageText(
           `📦 Оберіть відділення Нова Пошта у місті ${selectedCity.name}:`,
           novaPoshtaService.formatWarehousesForKeyboard(warehouses)
         )
-        
+
         return ctx.wizard.next()
       } catch (error) {
         console.error('Nova Poshta warehouses error:', error)
-        await ctx.editMessageText('❌ Помилка завантаження відділень.')
+        await ctx.editMessageText(
+          '❌ Помилка завантаження відділень.\n\n' +
+          'Спробуйте обрати інше місто або зверніться до підтримки.',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('⬅ Змінити місто', 'change_city')],
+            [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+          ])
+        )
         return
       }
     }
 
-    // Since we only have Nova Poshta delivery, this section is removed
+    // Handle unexpected input or stuck state
+    if (!ctx.callbackQuery && !ctx.scene.state.waitingForCity) {
+      await ctx.reply(
+        '⚠️ Щось пішло не так. Будь ласка, введіть назву вашого міста для доставки:',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+        ])
+      )
+      ctx.scene.state.waitingForCity = true
+      return
+    }
 
-    await ctx.reply('❌ Будь ласка, введіть назву міста або оберіть з запропонованих варіантів.')
+    // If still waiting for city but no valid input
+    if (ctx.scene.state.waitingForCity) {
+      await ctx.reply(
+        '❌ Будь ласка, введіть назву міста текстом.\n' +
+        'Наприклад: Київ, Харків, Львів',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+        ])
+      )
+    }
   },
 
-  // Step 7: Handle warehouse selection and payment method
+  // Step 8: Handle warehouse selection and payment method
   async(ctx) => {
+    // Reset timeout on user activity
+    if (ctx.callbackQuery) {
+      setOrderTimeout(ctx)
+    }
+
     // Handle warehouse selection for Nova Poshta
     if (ctx.callbackQuery?.data?.startsWith('warehouse_')) {
       const warehouseRef = ctx.callbackQuery.data.replace('warehouse_', '')
       const selectedWarehouse = ctx.scene.state.availableWarehouses?.find(wh => wh.ref === warehouseRef)
-      
+
       if (!selectedWarehouse) {
         await ctx.answerCbQuery('❌ Помилка вибору відділення')
         return
@@ -289,20 +440,34 @@ const orderWizard = new Scenes.WizardScene(
       ctx.scene.state.selectedWarehouse = null
 
       await ctx.editMessageText(
-        '🏙️ Введіть назву вашого міста для доставки Нова Пошта:\n\n(наприклад: Київ, Харків, Львів)',
+        '🏙️ Введіть назву вашого міста для доставки Нова Пошта:\n\n' +
+        '💡 Підказка: використовуйте українську мову\n' +
+        'Наприклад: Київ, Харків, Львів, Одеса',
         Markup.inlineKeyboard([
           [Markup.button.callback('❌ Скасувати', 'cancel_order')]
         ])
       )
 
-      return ctx.wizard.selectStep(5) // Go back to city selection
+      return ctx.wizard.selectStep(6) // Go back to city selection
     }
 
-    await ctx.reply('❌ Будь ласка, оберіть відділення Нова Пошта.')
+    // Handle unexpected state
+    await ctx.reply(
+      '⚠️ Будь ласка, оберіть відділення Нова Пошта зі списку вище.',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('⬅ Змінити місто', 'change_city')],
+        [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+      ])
+    )
   },
 
-  // Step 8: Order confirmation  
+  // Step 9: Order confirmation
   async(ctx) => {
+    // Reset timeout on user activity
+    if (ctx.callbackQuery) {
+      setOrderTimeout(ctx)
+    }
+
     const paymentMethods = {
       payment_prepaid: 'Передоплата на карту',
       payment_cod: 'Накладений платіж'
@@ -316,7 +481,7 @@ const orderWizard = new Scenes.WizardScene(
     ctx.scene.state.paymentMethod = paymentMethods[ctx.callbackQuery.data]
     await ctx.answerCbQuery()
 
-    const { product, customerName, customerPhone, productSize, deliveryMethod, paymentMethod } = ctx.scene.state
+    const { product, customerFirstName, customerLastName, customerPhone, productSize, deliveryMethod, paymentMethod } = ctx.scene.state
     const totalAmount = product.sale_price || product.price
 
     // Build delivery info for Nova Poshta
@@ -328,7 +493,8 @@ const orderWizard = new Scenes.WizardScene(
     }
 
     const orderSummary = '📋 Підтвердження замовлення\n\n' +
-      `👤 Ім'я: ${customerName}\n` +
+      `👤 Ім'я: ${customerFirstName}\n` +
+      `👤 Прізвище: ${customerLastName}\n` +
       `📱 Телефон: ${customerPhone}\n` +
       `📦 Товар: ${product.name}\n` +
       `📏 Розмір: ${productSize}\n` +
@@ -349,26 +515,30 @@ const orderWizard = new Scenes.WizardScene(
     return ctx.wizard.next()
   },
 
-  // Step 9: Submit to CRM
+  // Step 10: Submit to CRM
   async(ctx) => {
     if (!ctx.callbackQuery) return
 
     await ctx.answerCbQuery()
 
     if (ctx.callbackQuery.data === 'edit_order') {
+      setOrderTimeout(ctx) // Reset timeout when editing
       return ctx.wizard.selectStep(0) // Start over
     }
 
     if (ctx.callbackQuery.data === 'cancel_order') {
+      clearAllTimeouts(ctx)
       await ctx.editMessageText('❌ Замовлення скасовано.')
       return ctx.scene.leave()
     }
 
     if (ctx.callbackQuery.data === 'confirm_order') {
+      // Clear timeout when confirming order
+      clearAllTimeouts(ctx)
       await ctx.editMessageText('⏳ Обробляємо ваше замовлення...')
 
       try {
-        const { product, customerName, customerPhone, deliveryMethod, paymentMethod } = ctx.scene.state
+        const { product, customerName, customerFirstName, customerLastName, customerPhone, deliveryMethod, paymentMethod } = ctx.scene.state
 
         // Get user ID (fallback if ctx.user is not set)
         let userId = ctx.user?.id
@@ -426,6 +596,8 @@ const orderWizard = new Scenes.WizardScene(
             description: product.description
           }],
           customerName,
+          customerFirstName,
+          customerLastName,
           customerPhone,
           telegramUsername: ctx.from.username,
           deliveryMethod,
@@ -438,6 +610,9 @@ const orderWizard = new Scenes.WizardScene(
         if (crmResult.success) {
           // Update order with CRM ID
           await db.run('UPDATE orders SET crm_order_id = ? WHERE id = ?', [crmResult.orderId, orderId])
+
+          // Clear timeout on successful order
+          clearAllTimeouts(ctx)
 
           await ctx.editMessageText(
             '✅ Замовлення успішно оформлено!\n\n' +
@@ -453,6 +628,9 @@ const orderWizard = new Scenes.WizardScene(
         }
       } catch (error) {
         console.error('Order submission error:', error)
+        // Clear timeout on error
+        clearAllTimeouts(ctx)
+
         await ctx.editMessageText(
           '❌ Помилка при оформленні замовлення.\n\n' +
           'Ваші дані збережено, ми зв\'яжемося з вами вручну.\n\n' +
@@ -471,8 +649,29 @@ const orderWizard = new Scenes.WizardScene(
 // Handle cancel order
 orderWizard.action('cancel_order', async(ctx) => {
   await ctx.answerCbQuery()
+  clearAllTimeouts(ctx)
   await ctx.editMessageText('❌ Замовлення скасовано.')
   return ctx.scene.leave()
+})
+
+// Handle retry city search
+orderWizard.action('retry_city', async(ctx) => {
+  await ctx.answerCbQuery()
+  setOrderTimeout(ctx) // Reset timeout on retry
+  ctx.scene.state.waitingForCity = true
+  await ctx.editMessageText(
+    '🏙️ Введіть назву вашого міста для доставки Нова Пошта:\n\n' +
+    '💡 Підказка: використовуйте українську мову\n' +
+    'Наприклад: Київ, Харків, Львів, Одеса',
+    Markup.inlineKeyboard([
+      [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+    ])
+  )
+})
+
+// Clear timeout on scene leave
+orderWizard.leave((ctx) => {
+  clearAllTimeouts(ctx)
 })
 
 module.exports = orderWizard
