@@ -33,8 +33,8 @@ async function startServer() {
     console.log('Starting Vidoma Telegram Bot...')
     await bot.launch()
     console.log('Bot started successfully!')
-    
-    console.log('Admin panel running on http://localhost:80')
+
+    console.log(`Admin panel running on http://localhost:${process.env.PORT || 80}`)
     console.log('🎉 Server started successfully!')
     
   } catch (error) {

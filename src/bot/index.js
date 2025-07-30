@@ -83,8 +83,8 @@ function initializeBot(bot) {
 
   // Handle text messages (AI consultation) - fallback
   bot.on('text', async(ctx) => {
-    // Skip if in special modes
-    if (ctx.session.supportMessage || ctx.session.orderTracking) {
+    // Skip if in special modes or in wizard scene
+    if (ctx.session.supportMessage || ctx.session.orderTracking || ctx.session.__scenes?.current) {
       return
     }
 

@@ -3,6 +3,7 @@ const db = require('../database/connection')
 
 class AIService {
   constructor() {
+
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY
     })
@@ -65,14 +66,12 @@ ${JSON.stringify(productCatalog, null, 2)}
         temperature: 0.7
       })
 
-      const aiResponse = completion.choices[0].message.content
-
-      // Extract recommended product IDs from the response
+      const aiResponse = completion.choices[0]?.message?.content
       const recommendedProducts = this.extractProductRecommendations(aiResponse, products)
 
       return {
-        text: aiResponse,
-        recommendedProducts
+        text: aiResponse || 'Вибачте, не вдалося отримати відповідь від AI помічника.',
+        recommendedProducts: recommendedProducts || []
       }
     } catch (error) {
       console.error('AI Service Error:', error)
@@ -110,12 +109,14 @@ ${JSON.stringify(productCatalog, null, 2)}
     const buttons = []
 
     // Add product buttons
-    recommendedProducts.forEach(product => {
-      buttons.push([{
-        text: `🛍 ${product.name} - ${product.price}₴`,
-        callback_data: `product_${product.id}`
-      }])
-    })
+    if (recommendedProducts && Array.isArray(recommendedProducts)) {
+        recommendedProducts.forEach(product => {
+          buttons.push([{
+            text: `🛍 ${product.name} - ${product.price}₴`,
+            callback_data: `product_${product.id}`
+          }])
+        })
+      }
 
     // Add navigation buttons
     buttons.push([

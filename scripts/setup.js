@@ -48,7 +48,7 @@ async function setupDatabase() {
     console.log('\n💡 Next steps:')
     console.log('   1. Set your BOT_TOKEN in .env file')
     console.log('   2. Run: npm start')
-    console.log('   3. Access admin panel at: http://localhost:80')
+    console.log(`   3. Access admin panel at: http://localhost:${process.env.PORT || 80}`)
     
   } catch (error) {
     console.error('❌ Database setup failed:', error.message)

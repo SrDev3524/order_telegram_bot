@@ -372,10 +372,10 @@ XXL - грудь: 102-106 см, талія: 82-86 см`
     ctx.session.navigationStack = [{ type: 'main_menu' }]
 
     // Show main menu
-    const mainKeyboard = require('../keyboards/mainKeyboard')
+    const { mainReplyKeyboard } = require('../keyboards/mainKeyboard')
     await ctx.reply(
       '🏠 Головне меню\n\nОберіть потрібний розділ:',
-      mainKeyboard()
+      mainReplyKeyboard
     )
   })
 }

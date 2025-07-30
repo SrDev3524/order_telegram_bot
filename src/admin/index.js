@@ -37,4 +37,4 @@ app.get('/', (req, res) => {
     res.redirect('/auth/login')
   }
 })
-app.listen(80, () => console.log('Admin panel running on http://localhost:80'))
+app.listen(process.env.PORT || 80, () => console.log(`Admin panel running on http://localhost:${process.env.PORT || 80}`))

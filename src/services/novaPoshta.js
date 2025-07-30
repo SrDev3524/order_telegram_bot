@@ -15,11 +15,16 @@ class NovaPoshtaService {
         calledMethod: 'getCities',
         methodProperties: {
           FindByString: cityName,
-          Language: 'UA' // Force Ukrainian language
+          Language: 'UA'
         }
       })
+      
+      if (response.data.errors && response.data.errors.length > 0) {
+        console.error('Nova Poshta API Errors:', response.data.errors)
+        return []
+      }
 
-      if (response.data.success) {
+      if (response.data.success && response.data.data) {
         return response.data.data.map(city => ({
           name: city.DescriptionUa || city.Description,
           nameRu: city.DescriptionRu,
@@ -31,7 +36,7 @@ class NovaPoshtaService {
 
       return []
     } catch (error) {
-      console.error('Nova Poshta API error (searchCities):', error)
+      console.error('Nova Poshta API error (searchCities):', error.message)
       return []
     }
   }
