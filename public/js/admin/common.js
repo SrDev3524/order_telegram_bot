@@ -1,3 +1,3 @@
 $(document).ready(function() {
-  console.log('Admin panel loaded')
+  // Admin panel initialization
 })

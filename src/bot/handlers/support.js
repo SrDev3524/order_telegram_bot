@@ -1,19 +1,4 @@
-const db = require('../../database/connection')
-const { Telegram } = require('telegraf')
-
-// Admin bot for forwarding messages
-const ADMIN_BOT_TOKEN = process.env.ADMIN_BOT_TOKEN
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID
 function setupSupportHandlers(bot) {
-  // Initialize admin bot if token is provided
-  let adminBot = null
-  if (ADMIN_BOT_TOKEN) {
-    try {
-      adminBot = new Telegram(ADMIN_BOT_TOKEN)
-    } catch (error) {
-      console.error('Failed to initialize admin bot:', error)
-    }
-  }
 
   // Handle "Manager" button - show contact info only
   bot.hears('💬 Manager', async(ctx) => {

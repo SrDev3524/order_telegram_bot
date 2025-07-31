@@ -5,6 +5,8 @@ $(document).ready(function() {
     function initSettings() {
         $('#adminForm').on('submit', handleAdminFormSubmit);
         $('#systemForm').on('submit', handleSystemFormSubmit);
+        $('#backupForm').on('submit', handleBackupFormSubmit);
+        $('#restoreForm').on('submit', handleRestoreFormSubmit);
         $('#newPassword, #confirmPassword').on('input', validatePasswords);
     }
     
@@ -63,6 +65,72 @@ $(document).ready(function() {
             },
             error: function() {
                 alert('Помилка оновлення системних налаштувань');
+            }
+        });
+    }
+    
+    function handleBackupFormSubmit(e) {
+        e.preventDefault();
+        
+        const dateFrom = $('#dateFrom').val();
+        const dateTo = $('#dateTo').val();
+        
+        let url = '/admin/settings/backup';
+        const params = new URLSearchParams();
+        
+        if (dateFrom) params.append('dateFrom', dateFrom);
+        if (dateTo) params.append('dateTo', dateTo);
+        
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+        
+        // Download backup file
+        window.location.href = url;
+    }
+    
+    function handleRestoreFormSubmit(e) {
+        e.preventDefault();
+        
+        const fileInput = $('#sqlFile')[0];
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            alert('Please select a SQL file to restore');
+            return;
+        }
+        
+        if (!confirm('Are you sure you want to restore the database? This will overwrite existing data.')) {
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('sqlFile', file);
+        
+        const button = $(this).find('button[type="submit"]');
+        const originalText = button.html();
+        button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Restoring...');
+        
+        $.ajax({
+            url: '/admin/settings/restore',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    alert(response.success + '\n' + response.details);
+                    location.reload();
+                } else {
+                    alert(response.error || 'Restore failed');
+                }
+            },
+            error: function(xhr) {
+                const response = xhr.responseJSON;
+                alert(response?.error || 'Restore failed');
+            },
+            complete: function() {
+                button.prop('disabled', false).html(originalText);
             }
         });
     }

@@ -3,6 +3,23 @@ const router = express.Router()
 const bcrypt = require('bcrypt')
 const fs = require('fs').promises
 const path = require('path')
+const multer = require('multer')
+const backupService = require('../../services/backup')
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/sql' || file.originalname.endsWith('.sql')) {
+      cb(null, true)
+    } else {
+      cb(new Error('Only SQL files are allowed'))
+    }
+  }
+})
 
 // Settings file path
 const SETTINGS_FILE = path.join(__dirname, '../../data/settings.json')
@@ -168,6 +185,47 @@ router.post('/system', async(req, res) => {
   } catch (error) {
     console.error('Error updating settings:', error)
     res.json({ error: 'Помилка оновлення налаштувань' })
+  }
+})
+
+// Database backup route with date range
+router.get('/backup', async(req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.query
+    const backup = await backupService.generateBackup(dateFrom, dateTo)
+    
+    res.setHeader('Content-Type', 'application/sql')
+    res.setHeader('Content-Disposition', `attachment; filename="${backup.filename}"`)
+    res.setHeader('Content-Length', backup.size)
+    
+    res.send(backup.content)
+  } catch (error) {
+    console.error('Backup error:', error)
+    res.status(500).json({ error: 'Failed to generate backup' })
+  } finally {
+    await backupService.close()
+  }
+})
+
+// Database restore route
+router.post('/restore', upload.single('sqlFile'), async(req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No SQL file uploaded' })
+    }
+
+    const sqlContent = req.file.buffer.toString('utf8')
+    const result = await backupService.restoreBackup(sqlContent)
+    
+    res.json({ 
+      success: 'Database restored successfully',
+      details: `Executed ${result.executedStatements} of ${result.totalStatements} statements`
+    })
+  } catch (error) {
+    console.error('Restore error:', error)
+    res.status(500).json({ error: error.message })
+  } finally {
+    await backupService.close()
   }
 })
 

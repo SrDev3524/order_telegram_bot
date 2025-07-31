@@ -258,30 +258,22 @@ const orderWizard = new Scenes.WizardScene(
         }
 
         if (cities.length === 1) {
-          // Only one city found, proceed to warehouses
+          // Only one city found, ask for manual branch input
           ctx.scene.state.selectedCity = cities[0]
           ctx.scene.state.waitingForCity = false
-
-          await ctx.reply('📦 Завантажуємо список відділень...')
-          const warehouses = await novaPoshtaService.getWarehouses(cities[0].ref)
-
-          if (warehouses.length === 0) {
-            await ctx.reply(
-              '❌ У цьому місті немає відділень Нова Пошта.\n\n' +
-              'Спробуйте інше місто:',
-              Markup.inlineKeyboard([
-                [Markup.button.callback('⬅ Змінити місто', 'change_city')],
-                [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
-              ])
-            )
-            return
-          }
-
-          ctx.scene.state.availableWarehouses = warehouses
+          ctx.scene.state.waitingForWarehouseNumber = true
 
           await ctx.reply(
-            `📦 Оберіть відділення Нова Пошта у місті ${cities[0].name}:`,
-            novaPoshtaService.formatWarehousesForKeyboard(warehouses)
+            `📦 Місто ${cities[0].name} обрано.\n\n` +
+            '✍️ Введіть номер відділення або поштомату Нова Пошта:\n\n' +
+            '💡 Приклади:\n' +
+            '• Для відділення: 1, 2, 142\n' +
+            '• Для поштомату: 5310, 26571\n\n' +
+            'ℹ️ Ви можете знайти номер на сайті Нова Пошта або у додатку',
+            Markup.inlineKeyboard([
+              [Markup.button.callback('⬅ Змінити місто', 'change_city')],
+              [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+            ])
           )
 
           return ctx.wizard.next()
@@ -325,43 +317,22 @@ const orderWizard = new Scenes.WizardScene(
       ctx.scene.state.waitingForCity = false
       await ctx.answerCbQuery()
 
-      await ctx.editMessageText('📦 Завантажуємо список відділень...')
+      ctx.scene.state.waitingForWarehouseNumber = true
+      
+      await ctx.editMessageText(
+        `📦 Місто ${selectedCity.name} обрано.\n\n` +
+        '✍️ Введіть номер відділення або поштомату Нова Пошта:\n\n' +
+        '💡 Приклади:\n' +
+        '• Для відділення: 1, 2, 142\n' +
+        '• Для поштомату: 5310, 26571\n\n' +
+        'ℹ️ Ви можете знайти номер на сайті Нова Пошта або у додатку',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('⬅ Змінити місто', 'change_city')],
+          [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+        ])
+      )
 
-      try {
-        const warehouses = await novaPoshtaService.getWarehouses(selectedCity.ref)
-
-        if (warehouses.length === 0) {
-          await ctx.editMessageText(
-            '❌ У цьому місті немає відділень Нова Пошта.\n\n' +
-            'Спробуйте інше місто:',
-            Markup.inlineKeyboard([
-              [Markup.button.callback('⬅ Змінити місто', 'change_city')],
-              [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
-            ])
-          )
-          return
-        }
-
-        ctx.scene.state.availableWarehouses = warehouses
-
-        await ctx.editMessageText(
-          `📦 Оберіть відділення Нова Пошта у місті ${selectedCity.name}:`,
-          novaPoshtaService.formatWarehousesForKeyboard(warehouses)
-        )
-
-        return ctx.wizard.next()
-      } catch (error) {
-        console.error('Nova Poshta warehouses error:', error)
-        await ctx.editMessageText(
-          '❌ Помилка завантаження відділень.\n\n' +
-          'Спробуйте обрати інше місто або зверніться до підтримки.',
-          Markup.inlineKeyboard([
-            [Markup.button.callback('⬅ Змінити місто', 'change_city')],
-            [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
-          ])
-        )
-        return
-      }
+      return ctx.wizard.next()
     }
 
     // Handle unexpected input or stuck state
@@ -415,36 +386,80 @@ const orderWizard = new Scenes.WizardScene(
       return ctx.wizard.selectStep(6) // Go back to step 7 (city selection)
     }
 
-    // Handle warehouse selection for Nova Poshta
-    if (ctx.callbackQuery?.data?.startsWith('warehouse_')) {
-      const warehouseRef = ctx.callbackQuery.data.replace('warehouse_', '')
-      const selectedWarehouse = ctx.scene.state.availableWarehouses?.find(wh => wh.ref === warehouseRef)
-
-      if (!selectedWarehouse) {
-        await ctx.answerCbQuery('❌ Помилка вибору відділення')
+    // Handle manual warehouse number input
+    if (ctx.scene.state.waitingForWarehouseNumber && ctx.message?.text) {
+      const warehouseNumber = ctx.message.text.trim()
+      
+      // Validate warehouse number format (1-5 digits)
+      if (!/^\d{1,5}$/.test(warehouseNumber)) {
+        await ctx.reply(
+          '❌ Неправильний формат номера.\n\n' +
+          'Номер має складатися тільки з цифр (1-5 знаків).\n' +
+          'Приклади: 1, 142, 5310\n\n' +
+          'Спробуйте ще раз:',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('⬅ Змінити місто', 'change_city')],
+            [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+          ])
+        )
         return
       }
 
-      ctx.scene.state.selectedWarehouse = selectedWarehouse
-      await ctx.answerCbQuery()
+      await ctx.reply('🔍 Перевіряємо відділення...')
 
-      await ctx.editMessageText(
-        '💳 Оберіть спосіб оплати:',
-        Markup.inlineKeyboard([
-          [Markup.button.callback('💳 Передоплата на карту', 'payment_prepaid')],
-          [Markup.button.callback('💰 Накладений платіж', 'payment_cod')],
-          [Markup.button.callback('❌ Скасувати', 'cancel_order')]
-        ])
-      )
+      try {
+        // Validate warehouse exists in the selected city
+        const warehouses = await novaPoshtaService.getWarehouses(ctx.scene.state.selectedCity.ref)
+        const validWarehouse = warehouses.find(wh => wh.number === warehouseNumber)
 
-      return ctx.wizard.next()
+        if (!validWarehouse) {
+          await ctx.reply(
+            `❌ Відділення №${warehouseNumber} не знайдено в місті ${ctx.scene.state.selectedCity.name}.\n\n` +
+            '💡 Перевірте номер на сайті Нова Пошта або в додатку.\n\n' +
+            'Спробуйте інший номер:',
+            Markup.inlineKeyboard([
+              [Markup.button.callback('⬅ Змінити місто', 'change_city')],
+              [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+            ])
+          )
+          return
+        }
+
+        // Warehouse found and validated
+        ctx.scene.state.selectedWarehouse = validWarehouse
+        ctx.scene.state.waitingForWarehouseNumber = false
+
+        await ctx.reply(
+          `✅ Відділення підтверджено:\n` +
+          `📦 №${validWarehouse.number} - ${validWarehouse.description}\n\n` +
+          '💳 Оберіть спосіб оплати:',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('💳 Передоплата на карту', 'payment_prepaid')],
+            [Markup.button.callback('💰 Накладений платіж', 'payment_cod')],
+            [Markup.button.callback('❌ Скасувати', 'cancel_order')]
+          ])
+        )
+
+        return ctx.wizard.next()
+      } catch (error) {
+        console.error('Warehouse validation error:', error)
+        await ctx.reply(
+          '❌ Помилка перевірки відділення.\n\n' +
+          'Спробуйте ще раз або зверніться до підтримки:',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('⬅ Змінити місто', 'change_city')],
+            [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]
+          ])
+        )
+        return
+      }
     }
 
-    // Only show this message if we don't have a list of warehouses available
-    // This prevents the message from appearing when coming back from city selection
-    if (!ctx.scene.state.availableWarehouses && !ctx.message) {
+    // Handle invalid input when waiting for warehouse number
+    if (ctx.scene.state.waitingForWarehouseNumber && !ctx.message?.text) {
       await ctx.reply(
-        '⚠️ Будь ласка, оберіть відділення Нова Пошта зі списку вище.',
+        '❌ Будь ласка, введіть номер відділення текстом.\n' +
+        'Приклади: 1, 142, 5310',
         Markup.inlineKeyboard([
           [Markup.button.callback('⬅ Змінити місто', 'change_city')],
           [Markup.button.callback('❌ Скасувати замовлення', 'cancel_order')]

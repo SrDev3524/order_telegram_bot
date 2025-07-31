@@ -1,83 +1,85 @@
-const sqlite3 = require('sqlite3').verbose()
-const path = require('path')
-
-const dbPath = path.join(__dirname, '../../data/database.sqlite')
+const mysql = require('mysql2/promise')
 
 class Database {
   constructor() {
-    this.db = null
+    this.connection = null
+    this.pool = null
   }
 
   async connect() {
-    if (this.db) {
+    if (this.pool) {
       return Promise.resolve()
     }
 
-    return new Promise((resolve, reject) => {
-      this.db = new sqlite3.Database(dbPath, (err) => {
-        if (err) {
-          console.error('Error connecting to database:', err)
-          reject(err)
-        } else {
-          console.log('Connected to SQLite database')
-          this.db.run('PRAGMA foreign_keys = ON')
-          resolve()
-        }
+    try {
+      this.pool = mysql.createPool({
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 3306,
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'vidoma_bot',
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        acquireTimeout: 60000,
+        timeout: 60000,
+        reconnect: true
       })
-    })
+
+      // Test the connection
+      const connection = await this.pool.getConnection()
+      console.log('Connected to MySQL database')
+      connection.release()
+    } catch (err) {
+      console.error('Error connecting to database:', err)
+      throw err
+    }
   }
 
   async run(sql, params = []) {
-    return new Promise((resolve, reject) => {
-      this.db.run(sql, params, function(err) {
-        if (err) {
-          reject(err)
-        } else {
-          resolve({ id: this.lastID, changes: this.changes })
-        }
-      })
-    })
+    try {
+      const [result] = await this.pool.execute(sql, params)
+      return { 
+        id: result.insertId || null, 
+        changes: result.affectedRows || 0,
+        result: result
+      }
+    } catch (err) {
+      console.error('Database run error:', err)
+      throw err
+    }
   }
 
   async get(sql, params = []) {
-    return new Promise((resolve, reject) => {
-      this.db.get(sql, params, (err, row) => {
-        if (err) {
-          reject(err)
-        } else {
-          resolve(row)
-        }
-      })
-    })
+    try {
+      const [rows] = await this.pool.execute(sql, params)
+      return rows.length > 0 ? rows[0] : null
+    } catch (err) {
+      console.error('Database get error:', err)
+      throw err
+    }
   }
 
   async all(sql, params = []) {
-    return new Promise((resolve, reject) => {
-      this.db.all(sql, params, (err, rows) => {
-        if (err) {
-          reject(err)
-        } else {
-          resolve(rows)
-        }
-      })
-    })
+    try {
+      const [rows] = await this.pool.execute(sql, params)
+      return rows
+    } catch (err) {
+      console.error('Database all error:', err)
+      throw err
+    }
   }
 
   async close() {
-    return new Promise((resolve, reject) => {
-      if (this.db) {
-        this.db.close((err) => {
-          if (err) {
-            reject(err)
-          } else {
-            console.log('Database connection closed')
-            resolve()
-          }
-        })
-      } else {
-        resolve()
+    try {
+      if (this.pool) {
+        await this.pool.end()
+        console.log('Database connection pool closed')
       }
-    })
+    } catch (err) {
+      console.error('Error closing database:', err)
+      throw err
+    }
   }
 
   async getCategories(includeInactive = false) {
@@ -109,7 +111,7 @@ class Database {
     const { name, description, parent_id, image_url, sort_order, active } = categoryData
     const sql = `
       INSERT INTO categories (name, description, parent_id, image_url, sort_order, active, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
     `
     return await this.run(sql, [name, description, parent_id, image_url, sort_order, active])
   }
@@ -119,14 +121,14 @@ class Database {
     const sql = `
       UPDATE categories 
       SET name = ?, description = ?, parent_id = ?, image_url = ?, 
-          sort_order = ?, active = ?, updated_at = datetime('now')
+          sort_order = ?, active = ?, updated_at = NOW()
       WHERE id = ?
     `
     return await this.run(sql, [name, description, parent_id, image_url, sort_order, active, id])
   }
 
   async deleteCategory(id) {
-    const sql = 'UPDATE categories SET active = 0, updated_at = datetime(\'now\') WHERE id = ?'
+    const sql = 'UPDATE categories SET active = 0, updated_at = NOW() WHERE id = ?'
     return await this.run(sql, [id])
   }
 
@@ -185,7 +187,6 @@ class Database {
         WHERE p.category_id = ? AND p.active = 1
       `
       const result = await this.get(sql, [id])
-      console.log(`Product count for category ${id}:`, result)
       return result ? result.count : 0
     } catch (error) {
       console.error(`Error getting product count for category ${id}:`, error)

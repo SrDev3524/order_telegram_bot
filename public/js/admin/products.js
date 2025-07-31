@@ -42,7 +42,6 @@ $(document).ready(function() {
             try {
                 const response = await $.get(`/admin/products/api/${productId}`)
                 
-                console.log('Raw product data from server:', response)
                 
                 this.resetForm()
                 this.populateForm(response)
@@ -51,7 +50,6 @@ $(document).ready(function() {
                 $('#productModal').modal('show')
             } catch (error) {
                 this.showAlert('error', 'Помилка завантаження товару: ' + error.message)
-                console.error('Error loading product:', error)
             }
         },
 
@@ -68,14 +66,6 @@ $(document).ready(function() {
         },
 
         populateForm(product) {
-            console.log('Populating form with product data:', product)
-            
-            // Debug: Check what fields exist on the product object
-            console.log('Product fields:', Object.keys(product))
-            console.log('Price value:', product.price, typeof product.price)
-            console.log('Sale price value:', product.sale_price, typeof product.sale_price)
-            console.log('Stock quantity value:', product.stock_quantity, typeof product.stock_quantity)
-            console.log('Active value:', product.active, typeof product.active)
             
             // Populate all form fields with exact matches
             $('#productId').val(product.id || '')
@@ -92,16 +82,6 @@ $(document).ready(function() {
             // Handle checkbox properly
             $('#productActive').prop('checked', product.active === 1 || product.active === true)
             
-            // Debug: Check if form fields were actually populated
-            setTimeout(() => {
-                console.log('Form values after population:')
-                console.log('Name:', $('#productName').val())
-                console.log('Price:', $('#productPrice').val())
-                console.log('Sale Price:', $('#salePrice').val())
-                console.log('Stock:', $('#productStock').val())
-                console.log('Active:', $('#productActive').prop('checked'))
-                console.log('Category:', $('#productCategory').val())
-            }, 100)
             
             // Show existing images
             if (product.images) {
@@ -113,7 +93,6 @@ $(document).ready(function() {
                         this.showExistingImages(images)
                     }
                 } catch (e) {
-                    console.error('Error parsing product images:', e)
                 }
             }
         },
@@ -184,10 +163,6 @@ $(document).ready(function() {
             try {
                 const formData = new FormData(e.target)
                 
-                // Debug: Log form data
-                for (let pair of formData.entries()) {
-                    console.log(pair[0] + ': ' + pair[1])
-                }
                 
                 const response = await $.ajax({
                     url: `/admin/products/${productId}`,
@@ -204,7 +179,6 @@ $(document).ready(function() {
             } catch (error) {
                 const message = error.responseJSON?.error || 'Помилка збереження товару'
                 this.showAlert('error', message)
-                console.error('Error saving product:', error)
             } finally {
                 submitBtn.prop('disabled', false)
             }
@@ -229,7 +203,6 @@ $(document).ready(function() {
             } catch (error) {
                 const message = error.responseJSON?.error || 'Помилка видалення товару'
                 this.showAlert('error', message)
-                console.error('Error deleting product:', error)
             }
         },
 

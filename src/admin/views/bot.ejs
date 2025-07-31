@@ -1,0 +1,113 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Bot Control</h2>
+</div>
+
+<% if (error) { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <%= error %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<% } %>
+
+<% if (success) { %>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <%= success %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<% } %>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-robot"></i> Bot Status
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Status</label>
+                            <div>
+                                <span id="botStatus" class="badge <%= botStatus.isRunning ? 'bg-success' : 'bg-danger' %>">
+                                    <%= botStatus.isRunning ? 'Running' : 'Stopped' %>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <% if (botStatus.isRunning && botStatus.startTime) { %>
+                        <div class="mb-3">
+                            <label class="form-label">Started At</label>
+                            <div id="startTime"><%= new Date(botStatus.startTime).toLocaleString() %></div>
+                        </div>
+                        <% } %>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Uptime</label>
+                            <div id="uptime"><%= botStatus.uptimeFormatted %></div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Actions</label>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-success" id="startBtn" 
+                                        <%= botStatus.isRunning ? 'disabled' : '' %>>
+                                    <i class="fas fa-play"></i> Start Bot
+                                </button>
+                                
+                                <button type="button" class="btn btn-danger" id="stopBtn" 
+                                        <%= !botStatus.isRunning ? 'disabled' : '' %>>
+                                    <i class="fas fa-stop"></i> Stop Bot
+                                </button>
+                                
+                                <button type="button" class="btn btn-warning" id="restartBtn">
+                                    <i class="fas fa-redo"></i> Restart Bot
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> Bot Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <strong>Bot Token:</strong><br>
+                    <small class="text-muted">
+                        <%= process.env.BOT_TOKEN ? '***' + process.env.BOT_TOKEN.slice(-8) : 'Not configured' %>
+                    </small>
+                </div>
+                
+                <div class="mb-2">
+                    <strong>Database:</strong><br>
+                    <small class="text-success">
+                        <i class="fas fa-check-circle"></i> Connected
+                    </small>
+                </div>
+                
+                <div class="mb-2">
+                    <strong>Auto Refresh:</strong><br>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                        <label class="form-check-label" for="autoRefresh">
+                            Enabled (5s)
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/js/admin/bot.js"></script>

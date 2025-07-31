@@ -150,7 +150,11 @@ function setupOrderHandlers(bot) {
 
 // Track by TTN using Nova Poshta API
 async function trackByTTN(ttn) {
-  const apiKey = process.env.NOVA_POSHTA_API_KEY || '8f3a0fe9f223565adf6a4d6003b92e21'
+  const apiKey = process.env.NOVA_POSHTA_API_KEY
+  
+  if (!apiKey) {
+    throw new Error('Nova Poshta API key not configured')
+  }
 
   try {
     const response = await axios.post('https://api.novaposhta.ua/v2.0/json/', {

@@ -102,6 +102,54 @@
                 </form>
             </div>
         </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-database"></i> Database Backup & Restore
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Backup Database</h6>
+                        <p class="text-muted">Download database backup with optional date range filtering.</p>
+                        
+                        <form id="backupForm">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="dateFrom" class="form-label">From Date</label>
+                                    <input type="date" class="form-control" id="dateFrom" name="dateFrom">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="dateTo" class="form-label">To Date</label>
+                                    <input type="date" class="form-control" id="dateTo" name="dateTo">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-download"></i> Download Backup
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h6>Restore Database</h6>
+                        <p class="text-muted">Upload and restore database from SQL backup file.</p>
+                        
+                        <form id="restoreForm" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="sqlFile" class="form-label">SQL Backup File</label>
+                                <input type="file" class="form-control" id="sqlFile" name="sqlFile" 
+                                       accept=".sql" required>
+                            </div>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-upload"></i> Restore Database
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 

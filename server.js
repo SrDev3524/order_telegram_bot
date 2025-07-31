@@ -3,6 +3,7 @@ require('dotenv').config()
 const { Telegraf, session } = require('telegraf')
 const db = require('./src/database/connection')
 const initializeBot = require('./src/bot/index')
+const botControl = require('./src/services/botControl')
 
 // Initialize Telegram Bot
 const bot = new Telegraf(process.env.BOT_TOKEN)
@@ -19,6 +20,9 @@ bot.use(session({
 // Initialize bot handlers
 initializeBot(bot)
 
+// Set bot instance for control service
+botControl.setBot(bot)
+
 // Import and start admin panel
 const adminApp = require('./src/admin/index')
 
@@ -29,10 +33,9 @@ async function startServer() {
     await db.connect()
     console.log('Database connected successfully')
     
-    // Start bot
+    // Start bot automatically
     console.log('Starting Vidoma Telegram Bot...')
-    await bot.launch()
-    console.log('Bot started successfully!')
+    await botControl.startBot()
 
     console.log(`Admin panel running on http://localhost:${process.env.PORT || 80}`)
     console.log('🎉 Server started successfully!')
@@ -46,13 +49,17 @@ async function startServer() {
 // Graceful shutdown
 process.once('SIGINT', () => {
   console.log('Shutting down...')
-  bot.stop('SIGINT')
+  if (botControl.getStatus().isRunning) {
+    bot.stop('SIGINT')
+  }
   process.exit(0)
 })
 
 process.once('SIGTERM', () => {
   console.log('Shutting down...')
-  bot.stop('SIGTERM')
+  if (botControl.getStatus().isRunning) {
+    bot.stop('SIGTERM')
+  }
   process.exit(0)
 })
 
