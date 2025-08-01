@@ -148,10 +148,21 @@ function setupProductHandlers(bot) {
       let images = []
       try {
         if (product.images) {
-          images = JSON.parse(product.images)
+          if (typeof product.images === 'string') {
+            // Check if it's already a path (not JSON)
+            if (product.images.startsWith('/') || product.images.startsWith('http')) {
+              images = [product.images]
+            } else {
+              // Try to parse as JSON
+              images = JSON.parse(product.images)
+            }
+          } else if (Array.isArray(product.images)) {
+            images = product.images
+          }
         }
       } catch (e) {
-        console.log('No valid images for product:', productId)
+        console.log('Error parsing images, treating as single path:', product.images)
+        images = [product.images]
       }
 
       if (images.length > 0) {
@@ -257,10 +268,21 @@ XXL - грудь: 102-106 см, талія: 82-86 см`
       let images = []
       try {
         if (product.images) {
-          images = JSON.parse(product.images)
+          if (typeof product.images === 'string') {
+            // Check if it's already a path (not JSON)
+            if (product.images.startsWith('/') || product.images.startsWith('http')) {
+              images = [product.images]
+            } else {
+              // Try to parse as JSON
+              images = JSON.parse(product.images)
+            }
+          } else if (Array.isArray(product.images)) {
+            images = product.images
+          }
         }
       } catch (e) {
-        console.log('No valid images for product:', productId)
+        console.log('Error parsing images, treating as single path:', product.images)
+        images = [product.images]
       }
 
       if (images.length > 0) {

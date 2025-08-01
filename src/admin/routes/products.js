@@ -151,7 +151,7 @@ router.put('/:id', upload.array('images', 5), async(req, res) => {
     let updateQuery = `
       UPDATE products 
       SET name = ?, description = ?, sku = ?, price = ?, sale_price = ?, 
-          stock_quantity = ?, category_id = ?, active = ?, updated_at = datetime('now')
+          stock_quantity = ?, category_id = ?, active = ?, updated_at = NOW()
     `
     const queryParams = [
       name.trim(),

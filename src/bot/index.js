@@ -42,7 +42,7 @@ function initializeBot(bot) {
         } else {
           await db.run(`
             UPDATE users 
-            SET username = ?, first_name = ?, last_name = ?, updated_at = datetime('now')
+            SET username = ?, first_name = ?, last_name = ?, updated_at = NOW()
             WHERE telegram_id = ?
           `, [
             ctx.from.username || null,

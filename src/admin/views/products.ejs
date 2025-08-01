@@ -1,3 +1,27 @@
+<%
+// Helper function to safely parse images
+function parseImages(imagesData) {
+    try {
+        if (!imagesData) return [];
+        if (typeof imagesData === 'string') {
+            // Check if it's already a path (not JSON)
+            if (imagesData.startsWith('/') || imagesData.startsWith('http')) {
+                return [imagesData];
+            }
+            // Try to parse as JSON
+            return JSON.parse(imagesData);
+        }
+        if (Array.isArray(imagesData)) {
+            return imagesData;
+        }
+        return [];
+    } catch (e) {
+        // If parsing fails, treat as single image path
+        return [imagesData];
+    }
+}
+%>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Управління товарами</h2>
     <button type="button" class="btn btn-primary" id="addProductBtn">
@@ -65,8 +89,9 @@
                 <tr data-product-id="<%= product.id %>" data-category-id="<%= product.category_id %>" class="<%= product.active ? '' : 'table-secondary' %>">
                     <td><%= product.id %></td>
                     <td>
-                        <% if (product.images && JSON.parse(product.images)[0]) { %>
-                            <img src="<%= JSON.parse(product.images)[0] %>" alt="<%= product.name %>" 
+                        <% const images = parseImages(product.images); %>
+                        <% if (images.length > 0 && images[0]) { %>
+                            <img src="<%= images[0] %>" alt="<%= product.name %>" 
                                  class="product-thumbnail" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;"
                                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                             <div class="bg-light d-none align-items-center justify-content-center" 

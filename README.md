@@ -6,7 +6,7 @@ Complete e-commerce solution with Telegram bot, admin panel, and MySQL database.
 
 This is **Vidoma E-commerce Telegram Bot** - a complete e-commerce solution with:
 - **Customer Bot**: AI-powered product consultation, catalog browsing, order processing
-- **Admin Panel**: Product/order management, analytics dashboard, bot control, database backup/restore
+- **Admin Panel**: Product/order management, analytics dashboard, database backup/restore
 - **Integrations**: OpenAI GPT-4, SalesDrive CRM, Nova Poshta API
 
 ## Development Commands
@@ -128,7 +128,6 @@ Web interface at `http://localhost:3000` with features:
 - Order processing and status updates
 - Customer inquiry management
 - Sales analytics dashboard
-- Bot control (start/stop/restart)
 - Database backup/restore with date filtering
 
 Authentication: username `admin`, password from `ADMIN_PASSWORD` env var.

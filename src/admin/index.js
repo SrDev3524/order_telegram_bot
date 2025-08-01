@@ -29,7 +29,6 @@ app.use('/dashboard', authMiddleware, require('./routes/dashboard'))
 app.use('/admin/products', authMiddleware, require('./routes/products'))
 app.use('/admin/categories', authMiddleware, require('./routes/categories'))
 app.use('/admin/settings', authMiddleware, require('./routes/settings'))
-app.use('/admin/bot', authMiddleware, require('./routes/bot'))
 
 app.get('/', (req, res) => {
   if (req.session && req.session.admin) {
