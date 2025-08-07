@@ -59,6 +59,43 @@ class CRMService {
       }
     }
   }
+
+  async getUserOrders(telegramUserId) {
+    try {
+      const response = await axios.get(
+        `${this.apiUrl}/api/order/list/`,
+        {
+          headers: {
+            'Form-Api-Key': this.apiKey,
+            'Content-Type': 'application/json'
+          },
+          params: {
+            'filter[externalId]': telegramUserId,
+            'filter[statusId]': '__NOTDELETED__'
+          },
+          timeout: 15000
+        }
+      )
+
+      console.log('Order list response:', response.data)
+
+      return {
+        success: true,
+        orders: response.data.data || [],
+        totals: response.data.totals || {},
+        statusOptions: response.data.meta?.fields?.statusId?.options || []
+      }
+    } catch (error) {
+      console.error('CRM Order List API Error:', error.response?.data || error.message)
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message,
+        orders: [],
+        totals: {},
+        statusOptions: []
+      }
+    }
+  }
 }
 
 module.exports = new CRMService()

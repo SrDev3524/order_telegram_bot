@@ -21,18 +21,15 @@ const messages = {
 }
 
 function setupStartHandlers(bot) {
-  // Start command - show main menu with reply keyboard
   bot.start(async(ctx) => {
     ctx.session.navigationStack = [{ type: 'main_menu' }]
     await ctx.reply(messages.welcome, mainReplyKeyboard)
   })
 
-  // Help command
   bot.help(async(ctx) => {
     await ctx.reply(messages.help, mainReplyKeyboard)
   })
 
-  // Handle reply keyboard buttons
   bot.hears('❓ Help', async(ctx) => {
     await ctx.reply(messages.help, mainReplyKeyboard)
   })

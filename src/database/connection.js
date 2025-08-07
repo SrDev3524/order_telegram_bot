@@ -8,7 +8,8 @@ class Database {
 
   async connect() {
     if (this.pool) {
-      return Promise.resolve()
+      await this.pool.end()
+      this.pool = null
     }
 
     try {
@@ -20,10 +21,7 @@ class Database {
         database: process.env.DB_NAME || 'vidoma_bot',
         waitForConnections: true,
         connectionLimit: 10,
-        queueLimit: 0,
-        acquireTimeout: 60000,
-        timeout: 60000,
-        reconnect: true
+        queueLimit: 0
       })
 
       // Test the connection

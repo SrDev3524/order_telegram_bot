@@ -106,44 +106,44 @@
         <div class="card mt-4">
             <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-database"></i> Database Backup & Restore
+                    <i class="fas fa-database"></i> Резервне копіювання та відновлення бази даних
                 </h5>
             </div>
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6">
-                        <h6>Backup Database</h6>
-                        <p class="text-muted">Download database backup with optional date range filtering.</p>
+                        <h6>Резервне копіювання бази даних</h6>
+                        <p class="text-muted">Завантажити резервну копію бази даних з можливістю фільтрації за датою.</p>
                         
                         <form id="backupForm">
                             <div class="row mb-3">
                                 <div class="col-md-6">
-                                    <label for="dateFrom" class="form-label">From Date</label>
+                                    <label for="dateFrom" class="form-label">Дата з</label>
                                     <input type="date" class="form-control" id="dateFrom" name="dateFrom">
                                 </div>
                                 <div class="col-md-6">
-                                    <label for="dateTo" class="form-label">To Date</label>
+                                    <label for="dateTo" class="form-label">Дата по</label>
                                     <input type="date" class="form-control" id="dateTo" name="dateTo">
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-success">
-                                <i class="fas fa-download"></i> Download Backup
+                                <i class="fas fa-download"></i> Завантажити резервну копію
                             </button>
                         </form>
                     </div>
                     
                     <div class="col-md-6">
-                        <h6>Restore Database</h6>
-                        <p class="text-muted">Upload and restore database from SQL backup file.</p>
+                        <h6>Відновлення бази даних</h6>
+                        <p class="text-muted">Завантажити та відновити базу даних з файлу резервної копії SQL.</p>
                         
                         <form id="restoreForm" enctype="multipart/form-data">
                             <div class="mb-3">
-                                <label for="sqlFile" class="form-label">SQL Backup File</label>
+                                <label for="sqlFile" class="form-label">Файл резервної копії SQL</label>
                                 <input type="file" class="form-control" id="sqlFile" name="sqlFile" 
                                        accept=".sql" required>
                             </div>
                             <button type="submit" class="btn btn-warning">
-                                <i class="fas fa-upload"></i> Restore Database
+                                <i class="fas fa-upload"></i> Відновити базу даних
                             </button>
                         </form>
                     </div>

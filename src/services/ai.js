@@ -21,32 +21,56 @@ class AIService {
         ORDER BY c.name, p.name
       `)
 
-      // Create product catalog for AI context
-      const productCatalog = products.map(p => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: p.sale_price || p.price,
-        category: p.category_name,
-        stock: p.stock_quantity
-      }))
+      // Parse product variants from description
+      const enhancedCatalog = products.map(p => {
+        let variants = { colors: [], sizes: [] };
+        try {
+          if (p.description) {
+            variants = JSON.parse(p.description);
+          }
+        } catch (e) {
+          // Description might not be JSON
+        }
+        
+        return {
+          id: p.id,
+          name: p.name,
+          price: p.sale_price || p.price,
+          category: p.category_name,
+          colors: variants.colors || [],
+          sizes: variants.sizes || [],
+          stock: p.stock_quantity
+        };
+      });
 
       const systemPrompt = `Ви - консультант інтернет-магазину Vidoma, що спеціалізується на домашньому одязі та піжамах.
 
-Каталог товарів:
-${JSON.stringify(productCatalog, null, 2)}
+Каталог товарів з доступними кольорами та розмірами:
+${JSON.stringify(enhancedCatalog, null, 2)}
 
 Ваші завдання:
 1. Відповідайте українською мовою
 2. Будьте дружнім та професійним консультантом
-3. Рекомендуйте конкретні товари з каталогу
-4. Давайте корисні поради щодо вибору розмірів та догляду
-5. Якщо немає підходящих товарів, вибачтесь та запропонуйте альтернативи
-6. Завжди завершуйте відповідь пропозицією допомоги
+3. Рекомендуйте конкретні товари з каталогу на основі запиту користувача
+4. Згадуйте доступні кольори та розміри товарів
+5. Давайте корисні поради щодо вибору розмірів та догляду
+6. Якщо користувач згадує колір або розмір, покажіть товари що є в наявності в таких варіантах
+7. Завжди завершуйте відповідь пропозицією допомоги
+
+Категорії товарів:
+- Комплекти з мереживом (різні кольори та розміри)
+- Гейша (кімоно та халати)
+- Для вулиці (велюрові комплекти)
+- Нічні сорочки (різні довжини)
+- Піжами (з принтом та без)
+- Пухнасті тапулі
+- Сет «Гарна»
+- Шорти з розрізом
+- Інше
 
 Формат відповіді:
 - Короткий привітальний текст
-- Рекомендації товарів (назва, ціна, чому підходить)
+- Рекомендації товарів (назва, ціна, доступні кольори та розміри)
 - Корисні поради
 - Пропозиція додаткової допомоги`
 

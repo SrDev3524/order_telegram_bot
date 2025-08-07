@@ -36,7 +36,7 @@ const setOrderTimeout = (ctx) => {
 const orderWizard = new Scenes.WizardScene(
   'order-wizard',
 
-  // Step 1: Customer first name
+  // Step 1: Color selection (if available)
   async(ctx) => {
     setOrderTimeout(ctx)
 
@@ -57,8 +57,142 @@ const orderWizard = new Scenes.WizardScene(
 
     ctx.scene.state.product = product
 
+    // Parse product variants
+    let variants = { colors: [], sizes: [] }
+    try {
+      if (product.description) {
+        variants = JSON.parse(product.description)
+      }
+    } catch (e) {
+      console.log('Failed to parse product variants')
+    }
+
+    ctx.scene.state.availableColors = variants.colors || []
+    ctx.scene.state.availableSizes = variants.sizes || []
+
+    // If product has colors, show color selection
+    if (ctx.scene.state.availableColors.length > 0) {
+      const colorButtons = ctx.scene.state.availableColors.map(color => 
+        [Markup.button.callback(color, `color_${color}`)]
+      )
+
+      await ctx.reply(
+        `🛒 Оформлення замовлення\n\n📦 Товар: ${product.name}\n💰 Ціна: ${product.sale_price || product.price}₴\n\n🎨 Оберіть колір:`,
+        Markup.inlineKeyboard([
+          ...colorButtons,
+          [Markup.button.callback('❌ Скасувати', 'cancel_order')]
+        ])
+      )
+      return ctx.wizard.next()
+    } else {
+      // Skip to size selection if no colors
+      ctx.scene.state.selectedColor = null
+      return ctx.wizard.selectStep(2)
+    }
+  },
+
+  // Step 2: Size selection (if available)
+  async(ctx) => {
+    // If we came from a callback query
+    if (ctx.callbackQuery) {
+      // Handle color selection
+      const colorMatch = ctx.callbackQuery.data.match(/^color_(.+)$/)
+      if (colorMatch) {
+        ctx.scene.state.selectedColor = colorMatch[1]
+        await ctx.answerCbQuery()
+      }
+      
+      // Handle size guide
+      if (ctx.callbackQuery.data === 'size_guide') {
+        await ctx.answerCbQuery()
+        const sizeButtons = []
+        const sizesPerRow = 3
+        
+        for (let i = 0; i < ctx.scene.state.availableSizes.length; i += sizesPerRow) {
+          const row = ctx.scene.state.availableSizes
+            .slice(i, i + sizesPerRow)
+            .map(size => Markup.button.callback(size, `size_${size}`))
+          sizeButtons.push(row)
+        }
+
+        await ctx.editMessageText(
+          '📖 Довідка по розмірах\n\n' +
+          'XS - обхват грудей: 82-86 см\n' +
+          'S - обхват грудей: 86-90 см\n' +
+          'M - обхват грудей: 90-94 см\n' +
+          'L - обхват грудей: 94-98 см\n' +
+          'XL - обхват грудей: 98-102 см\n' +
+          'XXL - обхват грудей: 102-106 см\n' +
+          '3XL - обхват грудей: 106-110 см\n' +
+          '4XL - обхват грудей: 110-114 см\n' +
+          '5XL - обхват грудей: 114-118 см\n\n' +
+          'Оберіть ваш розмір:',
+          Markup.inlineKeyboard([
+            ...sizeButtons,
+            [Markup.button.callback('❌ Скасувати', 'cancel_order')]
+          ])
+        )
+        return
+      }
+    }
+
+    // If product has sizes, show size selection
+    if (ctx.scene.state.availableSizes.length > 0) {
+      const sizeButtons = []
+      const sizesPerRow = 3
+      
+      for (let i = 0; i < ctx.scene.state.availableSizes.length; i += sizesPerRow) {
+        const row = ctx.scene.state.availableSizes
+          .slice(i, i + sizesPerRow)
+          .map(size => Markup.button.callback(size, `size_${size}`))
+        sizeButtons.push(row)
+      }
+
+      let message = `📏 Оберіть розмір:`
+      if (ctx.scene.state.selectedColor) {
+        message = `Колір: ${ctx.scene.state.selectedColor}\n\n${message}`
+      }
+
+      await ctx.reply(
+        message,
+        Markup.inlineKeyboard([
+          ...sizeButtons,
+          [Markup.button.callback('📖 Довідка по розмірах', 'size_guide')],
+          [Markup.button.callback('❌ Скасувати', 'cancel_order')]
+        ])
+      )
+      return ctx.wizard.next()
+    } else {
+      // Skip to customer name if no sizes
+      ctx.scene.state.selectedSize = null
+      return ctx.wizard.selectStep(3)
+    }
+  },
+
+  // Step 3: Customer first name
+  async(ctx) => {
+    // If we came from a callback query (size selection)
+    if (ctx.callbackQuery) {
+      const sizeMatch = ctx.callbackQuery.data.match(/^size_(.+)$/)
+      if (sizeMatch) {
+        ctx.scene.state.selectedSize = sizeMatch[1]
+        await ctx.answerCbQuery()
+      }
+    }
+
+    setOrderTimeout(ctx)
+
+    let orderDetails = `🛒 Ваше замовлення:\n📦 ${ctx.scene.state.product.name}\n`
+    if (ctx.scene.state.selectedColor) {
+      orderDetails += `🎨 Колір: ${ctx.scene.state.selectedColor}\n`
+    }
+    if (ctx.scene.state.selectedSize) {
+      orderDetails += `📏 Розмір: ${ctx.scene.state.selectedSize}\n`
+    }
+    orderDetails += `💰 Ціна: ${ctx.scene.state.product.sale_price || ctx.scene.state.product.price}₴\n\n`
+
     await ctx.reply(
-      `🛒 Оформлення замовлення\n\n📦 Товар: ${product.name}\n💰 Ціна: ${product.sale_price || product.price}₴\n\n👤 Введіть ваше ім'я (Ім'я):`,
+      orderDetails + '👤 Введіть ваше ім\'я:',
       Markup.inlineKeyboard([
         [Markup.button.callback('❌ Скасувати', 'cancel_order')]
       ])
@@ -67,7 +201,7 @@ const orderWizard = new Scenes.WizardScene(
     return ctx.wizard.next()
   },
 
-  // Step 2: Customer last name
+  // Step 4: Customer last name
   async(ctx) => {
     // Reset timeout on user activity
     setOrderTimeout(ctx)
@@ -80,7 +214,7 @@ const orderWizard = new Scenes.WizardScene(
     ctx.scene.state.customerFirstName = ctx.message.text.trim()
 
     await ctx.reply(
-      '👤 Введіть ваше прізвище (Прізвище):',
+      '👤 Введіть ваше прізвище:',
       Markup.inlineKeyboard([
         [Markup.button.callback('❌ Скасувати', 'cancel_order')]
       ])
@@ -89,7 +223,7 @@ const orderWizard = new Scenes.WizardScene(
     return ctx.wizard.next()
   },
 
-  // Step 3: Phone number
+  // Step 5: Phone number
   async(ctx) => {
     // Reset timeout on user activity
     setOrderTimeout(ctx)
@@ -112,7 +246,7 @@ const orderWizard = new Scenes.WizardScene(
     return ctx.wizard.next()
   },
 
-  // Step 4: Size selection
+  // Step 6: Delivery method (Nova Poshta city)
   async(ctx) => {
     // Reset timeout on user activity
     setOrderTimeout(ctx)
@@ -131,65 +265,6 @@ const orderWizard = new Scenes.WizardScene(
     ctx.scene.state.customerPhone = phone
 
     await ctx.reply(
-      '📏 Оберіть розмір:',
-      Markup.inlineKeyboard([
-        [Markup.button.callback('XS', 'size_xs'), Markup.button.callback('S', 'size_s')],
-        [Markup.button.callback('M', 'size_m'), Markup.button.callback('L', 'size_l')],
-        [Markup.button.callback('XL', 'size_xl'), Markup.button.callback('XXL', 'size_xxl')],
-        [Markup.button.callback('📖 Довідка по розмірах', 'size_guide')],
-        [Markup.button.callback('❌ Скасувати', 'cancel_order')]
-      ])
-    )
-
-    return ctx.wizard.next()
-  },
-
-  // Step 5: Delivery method
-  async(ctx) => {
-    // Reset timeout on user activity
-    setOrderTimeout(ctx)
-
-    const sizes = {
-      size_xs: 'XS',
-      size_s: 'S',
-      size_m: 'M',
-      size_l: 'L',
-      size_xl: 'XL',
-      size_xxl: 'XXL'
-    }
-
-    if (ctx.callbackQuery?.data === 'size_guide') {
-      await ctx.answerCbQuery()
-      // Reset timeout on size guide view
-      setOrderTimeout(ctx)
-      await ctx.editMessageText(
-        '📖 Довідка по розмірах\n\n' +
-        'XS - обхват грудей: 82-86 см\n' +
-        'S - обхват грудей: 86-90 см\n' +
-        'M - обхват грудей: 90-94 см\n' +
-        'L - обхват грудей: 94-98 см\n' +
-        'XL - обхват грудей: 98-102 см\n' +
-        'XXL - обхват грудей: 102-106 см\n\n' +
-        'Оберіть ваш розмір:',
-        Markup.inlineKeyboard([
-          [Markup.button.callback('XS', 'size_xs'), Markup.button.callback('S', 'size_s')],
-          [Markup.button.callback('M', 'size_m'), Markup.button.callback('L', 'size_l')],
-          [Markup.button.callback('XL', 'size_xl'), Markup.button.callback('XXL', 'size_xxl')],
-          [Markup.button.callback('❌ Скасувати', 'cancel_order')]
-        ])
-      )
-      return
-    }
-
-    if (!ctx.callbackQuery || !sizes[ctx.callbackQuery.data]) {
-      await ctx.reply('❌ Будь ласка, оберіть розмір з кнопок.')
-      return
-    }
-
-    ctx.scene.state.productSize = sizes[ctx.callbackQuery.data]
-    await ctx.answerCbQuery()
-
-    await ctx.editMessageText(
       '📦 Доставка через Нова Пошта\n\nВведіть назву вашого міста:',
       Markup.inlineKeyboard([
         [Markup.button.callback('❌ Скасувати', 'cancel_order')]
@@ -200,17 +275,10 @@ const orderWizard = new Scenes.WizardScene(
     ctx.scene.state.deliveryMethod = 'Нова Пошта'
     ctx.scene.state.waitingForCity = true
 
-    // Skip step 6 and go directly to step 7 where city input is handled
-    return ctx.wizard.selectStep(6)
-  },
-
-  // Step 6: Nova Poshta city input (delivery method is already set)
-  async(ctx) => {
-    // This step is now skipped by using selectStep(7)
     return ctx.wizard.next()
   },
 
-  // Step 7: Handle Nova Poshta city search and selection
+  // Step 7: Handle Nova Poshta city search and warehouse selection
   async(ctx) => {
     if (ctx.message || ctx.callbackQuery) {
       setOrderTimeout(ctx)
@@ -434,8 +502,8 @@ const orderWizard = new Scenes.WizardScene(
           `📦 №${validWarehouse.number} - ${validWarehouse.description}\n\n` +
           '💳 Оберіть спосіб оплати:',
           Markup.inlineKeyboard([
+            [Markup.button.callback('📮 Післяплата', 'payment_postpaid')],
             [Markup.button.callback('💳 Передоплата на карту', 'payment_prepaid')],
-            [Markup.button.callback('💰 Накладений платіж', 'payment_cod')],
             [Markup.button.callback('❌ Скасувати', 'cancel_order')]
           ])
         )
@@ -476,8 +544,8 @@ const orderWizard = new Scenes.WizardScene(
     }
 
     const paymentMethods = {
-      payment_prepaid: 'Передоплата на карту',
-      payment_cod: 'Накладений платіж'
+      payment_postpaid: 'Післяплата',
+      payment_prepaid: 'Передоплата на карту'
     }
 
     if (!ctx.callbackQuery || !paymentMethods[ctx.callbackQuery.data]) {
@@ -488,7 +556,7 @@ const orderWizard = new Scenes.WizardScene(
     ctx.scene.state.paymentMethod = paymentMethods[ctx.callbackQuery.data]
     await ctx.answerCbQuery()
 
-    const { product, customerFirstName, customerLastName, customerPhone, productSize, deliveryMethod, paymentMethod } = ctx.scene.state
+    const { product, customerFirstName, customerLastName, customerPhone, selectedColor, selectedSize, deliveryMethod, paymentMethod } = ctx.scene.state
     const totalAmount = product.sale_price || product.price
 
     // Build delivery info for Nova Poshta
@@ -504,7 +572,8 @@ const orderWizard = new Scenes.WizardScene(
       `👤 Прізвище: ${customerLastName}\n` +
       `📱 Телефон: ${customerPhone}\n` +
       `📦 Товар: ${product.name}\n` +
-      `📏 Розмір: ${productSize}\n` +
+      (selectedColor ? `🎨 Колір: ${selectedColor}\n` : '') +
+      (selectedSize ? `📏 Розмір: ${selectedSize}\n` : '') +
       `💰 Ціна: ${totalAmount}₴\n` +
       deliveryInfo +
       `💳 Оплата: ${paymentMethod}\n\n` +
@@ -558,10 +627,6 @@ const orderWizard = new Scenes.WizardScene(
           throw new Error('User not found in database')
         }
 
-        // Generate order number
-        const orderPrefix = 'VID'
-        const orderNumber = `${orderPrefix}${Date.now()}`
-
         // Build delivery address and Nova Poshta data (Nova Poshta only)
         let deliveryAddress = ''
         let novaPoshta = {}
@@ -570,37 +635,46 @@ const orderWizard = new Scenes.WizardScene(
           // Prepare Nova Poshta data for CRM
           novaPoshta = novaPoshtaService.prepareForCRM(ctx.scene.state.selectedCity, ctx.scene.state.selectedWarehouse)
           deliveryAddress = `${ctx.scene.state.selectedCity.name}, відділення №${ctx.scene.state.selectedWarehouse.number}`
+          
+          // Add postpaid field based on payment method
+          if (paymentMethod === 'Післяплата') {
+            novaPoshta.postpaid = 'Payment control'
+          } else if (paymentMethod === 'Передоплата на карту') {
+            novaPoshta.postpaid = 'No cash on delivery'
+          }
         }
 
-        // Save order to database
-        const orderResult = await db.run(`
-          INSERT INTO orders (
-            order_number, user_id, status, total_amount, customer_name, customer_phone, 
-            delivery_method, delivery_address, payment_method, notes
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          orderNumber, userId, 'pending', product.sale_price || product.price,
-          customerName, customerPhone, deliveryMethod, deliveryAddress, paymentMethod,
-          `Telegram: @${ctx.from.username || ctx.from.first_name}. Розмір: ${ctx.scene.state.productSize}`
-        ])
+        // Build clean product name with selected variants (no JSON data)
+        let productDisplayName = product.name
+        
+        // Remove any JSON data that might be in the product name
+        if (productDisplayName.includes('({"colors"')) {
+          productDisplayName = productDisplayName.split('({"colors"')[0].trim()
+        }
+        
+        // Add selected variants
+        const variants = []
+        if (ctx.scene.state.selectedColor) {
+          variants.push(ctx.scene.state.selectedColor)
+        }
+        if (ctx.scene.state.selectedSize) {
+          variants.push(ctx.scene.state.selectedSize)
+        }
+        if (variants.length > 0) {
+          productDisplayName += ` - ${variants.join(', ')}`
+        }
 
-        const orderId = orderResult.id
-
-        // Save order items
-        await db.run(`
-          INSERT INTO order_items (order_id, product_id, product_name, product_price, quantity, size)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `, [orderId, product.id, product.name, product.sale_price || product.price, 1, ctx.scene.state.productSize])
-
-        // Submit to CRM with Nova Poshta data
+        // Submit to CRM with Nova Poshta data  
         const crmResult = await crmService.createOrder({
-          telegramOrderId: orderId,
+          telegramOrderId: ctx.from.id.toString(), // Use Telegram user ID instead
           products: [{
             id: product.id,
-            name: product.name,
+            name: productDisplayName,
             price: product.sale_price || product.price,
             quantity: 1,
-            description: product.description
+            description: '', // Clean description, no JSON data
+            color: ctx.scene.state.selectedColor,
+            size: ctx.scene.state.selectedSize
           }],
           customerName,
           customerFirstName,
@@ -611,19 +685,16 @@ const orderWizard = new Scenes.WizardScene(
           deliveryAddress,
           paymentMethod,
           novaPoshta, // Include Nova Poshta parameters
-          notes: `Замовлення #${orderId} з Telegram бота. Розмір: ${ctx.scene.state.productSize}`
+          notes: `The order from the telegram bot. ${ctx.scene.state.selectedColor ? `Колір: ${ctx.scene.state.selectedColor}. ` : ''}${ctx.scene.state.selectedSize ? `Розмір: ${ctx.scene.state.selectedSize}` : ''}`
         })
 
         if (crmResult.success) {
-          // Update order with CRM ID
-          await db.run('UPDATE orders SET crm_order_id = ? WHERE id = ?', [crmResult.orderId, orderId])
-
           // Clear timeout on successful order
           clearAllTimeouts(ctx)
 
           await ctx.editMessageText(
             '✅ Замовлення успішно оформлено!\n\n' +
-            `📋 Номер замовлення: ${orderNumber}\n` +
+            `📋 Номер замовлення: ${crmResult.orderId}\n` +
             '📱 Наш менеджер зв\'яжеться з вами найближчим часом.\n\n' +
             'Дякуємо за покупку! 🙏',
             Markup.inlineKeyboard([

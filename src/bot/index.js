@@ -1,65 +1,28 @@
 const { Scenes } = require('telegraf')
-const db = require('../database/connection')
 const aiService = require('../services/ai')
 const orderWizard = require('./scenes/orderWizard')
 
-// Import handlers
 const { setupStartHandlers } = require('./handlers/start')
 const { setupProductHandlers } = require('./handlers/products')
 const { setupOrderHandlers } = require('./handlers/orders')
 const { setupSupportHandlers } = require('./handlers/support')
 
 function initializeBot(bot) {
-  // Setup scenes (session already configured in server.js)
   const stage = new Scenes.Stage([orderWizard])
   bot.use(stage.middleware())
 
-  // Middleware to register/update user
   bot.use(async(ctx, next) => {
     if (ctx.from) {
-      try {
-        const existingUser = await db.get(
-          'SELECT * FROM users WHERE telegram_id = ?',
-          [ctx.from.id]
-        )
-
-        if (!existingUser) {
-          await db.run(`
-            INSERT INTO users (telegram_id, username, first_name, last_name)
-            VALUES (?, ?, ?, ?)
-          `, [
-            ctx.from.id,
-            ctx.from.username || null,
-            ctx.from.first_name || null,
-            ctx.from.last_name || null
-          ])
-
-          // Get the newly created user with ID
-          ctx.user = await db.get(
-            'SELECT * FROM users WHERE telegram_id = ?',
-            [ctx.from.id]
-          )
-        } else {
-          await db.run(`
-            UPDATE users 
-            SET username = ?, first_name = ?, last_name = ?, updated_at = NOW()
-            WHERE telegram_id = ?
-          `, [
-            ctx.from.username || null,
-            ctx.from.first_name || null,
-            ctx.from.last_name || null,
-            ctx.from.id
-          ])
-          ctx.user = existingUser
-        }
-      } catch (error) {
-        console.error('Error handling user:', error)
+      ctx.user = {
+        id: ctx.from.id,
+        username: ctx.from.username,
+        first_name: ctx.from.first_name,
+        last_name: ctx.from.last_name
       }
     }
     return next()
   })
 
-  // Navigation helpers
   bot.context.goBack = function() {
     if (this.session.navigationStack && this.session.navigationStack.length > 1) {
       this.session.navigationStack.pop()
@@ -75,54 +38,49 @@ function initializeBot(bot) {
     this.session.navigationStack.push(state)
   }
 
-  // Setup handlers
   setupStartHandlers(bot)
   setupProductHandlers(bot)
   setupOrderHandlers(bot)
   setupSupportHandlers(bot)
 
-  // Handle text messages (AI consultation) - fallback
   bot.on('text', async(ctx) => {
-    // Skip if in special modes or in wizard scene
-    if (ctx.session.supportMessage || ctx.session.orderTracking || ctx.session.__scenes?.current) {
+    if (ctx.session.supportMessage) {
+      return
+    }
+    
+    if (ctx.session.__scenes?.current && !ctx.scene?.state?.completed) {
       return
     }
 
-    try {
-      const user = await db.get(
-        'SELECT id FROM users WHERE telegram_id = ?',
-        [ctx.from.id]
-      )
-
-      if (user) {
-        // Save inquiry for admin review
-        await db.run(`
-          INSERT INTO customer_inquiries (user_id, message)
-          VALUES (?, ?)
-        `, [user.id, ctx.message.text])
-
-        // Show typing indicator
+    if (ctx.session.aiSearchMode) {
+      try {
         await ctx.sendChatAction('typing')
 
-        // Get AI consultation
         const aiResponse = await aiService.getProductRecommendations(
           ctx.message.text,
-          user.id
+          ctx.user.id
         )
 
-        // Send AI response with product recommendations
         const keyboard = aiService.createRecommendationKeyboard(aiResponse.recommendedProducts)
         await ctx.reply(aiResponse.text, keyboard)
-      }
-    } catch (error) {
-      console.error('Error in AI consultation:', error)
-      await ctx.reply(`❌ Вибачте, виникла помилка. Ваше повідомлення збережено, і ми відповімо вручну.
+        
+        ctx.session.aiSearchMode = false
+      } catch (error) {
+        console.error('Error in AI consultation:', error)
+        await ctx.reply(`❌ Вибачте, виникла помилка з AI помічником.
 
 Щоб повернутися до головного меню, використайте /start`)
+        ctx.session.aiSearchMode = false
+      }
+      return
     }
+
+    await ctx.reply(`📝 Дякуємо за повідомлення!
+
+Щоб переглянути товари або використати AI помічник, натисніть 🛍 Browse Products.
+Для повернення до головного меню використайте /start`)
   })
 
-  // Error handling
   bot.catch((err, ctx) => {
     console.error('Bot error:', err)
     try {

@@ -16,6 +16,33 @@ function setupProductHandlers(bot) {
   // Handle "Browse Products" button
   bot.hears('🛍 Browse Products', async(ctx) => {
     try {
+      ctx.session.navigationStack = [{ type: 'browse_mode_selection' }]
+
+      const keyboard = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '📋 Обрати з каталогу', callback_data: 'browse_manual' },
+              { text: '🤖 AI помічник', callback_data: 'browse_ai' }
+            ],
+            [{ text: messages.main_menu_btn, callback_data: 'main_menu' }]
+          ]
+        }
+      }
+
+      await ctx.reply(`🛍 Оберіть спосіб пошуку товарів:
+
+📋 **Обрати з каталогу** - переглядайте товари по категоріях
+🤖 **AI помічник** - опишіть, що ви шукаєте, і я допоможу підібрати`, keyboard)
+    } catch (error) {
+      console.error('Error showing browse options:', error)
+      await ctx.reply('Сталася помилка.')
+    }
+  })
+
+  // Handle manual browsing selection
+  bot.action('browse_manual', async(ctx) => {
+    try {
       const categories = await db.all(`
         SELECT id, name, description 
         FROM categories 
@@ -24,11 +51,11 @@ function setupProductHandlers(bot) {
       `)
 
       if (categories.length === 0) {
-        await ctx.reply('На разі немає доступних категорій.')
+        await ctx.editMessageText('На разі немає доступних категорій.')
         return
       }
 
-      ctx.session.navigationStack = [{ type: 'categories' }]
+      ctx.session.navigationStack.push({ type: 'categories' })
 
       const keyboard = {
         reply_markup: {
@@ -37,15 +64,37 @@ function setupProductHandlers(bot) {
               text: cat.name,
               callback_data: `category_${cat.id}`
             }]),
-            [{ text: messages.main_menu_btn, callback_data: 'main_menu' }]
+            [{ text: messages.back, callback_data: 'back' }]
           ]
         }
       }
 
-      await ctx.reply(messages.categories, keyboard)
+      await ctx.editMessageText(messages.categories, keyboard)
     } catch (error) {
       console.error('Error loading categories:', error)
-      await ctx.reply('Сталася помилка завантаження категорій.')
+      await ctx.editMessageText('Сталася помилка завантаження категорій.')
+    }
+  })
+
+  // Handle AI assistant selection
+  bot.action('browse_ai', async(ctx) => {
+    try {
+      ctx.session.aiSearchMode = true
+      await ctx.editMessageText(`🤖 AI Помічник активований!
+
+Опишіть, що ви шукаєте. Наприклад:
+• "Я хочу нічну сорочку"
+• "Покажи мереживні комплекти"
+• "Що у вас є для дому?"
+
+Просто напишіть своє побажання, і я допоможу підібрати товари з нашого каталогу.
+
+Для повернення до головного меню використайте /start`)
+      
+      await ctx.answerCbQuery()
+    } catch (error) {
+      console.error('Error activating AI mode:', error)
+      await ctx.editMessageText('Сталася помилка активації AI помічника.')
     }
   })
 
@@ -125,9 +174,26 @@ function setupProductHandlers(bot) {
       const originalPrice = product.sale_price ? product.price : null
 
       let productText = `🛍 ${product.name}\n\n`
+      
+      // Parse and display colors and sizes in user-friendly format
       if (product.description) {
-        productText += `📝 ${product.description}\n\n`
+        try {
+          const variants = JSON.parse(product.description)
+          if (variants.colors && variants.colors.length > 0) {
+            productText += `🎨 Доступні кольори: ${variants.colors.join(', ')}\n`
+          }
+          if (variants.sizes && variants.sizes.length > 0) {
+            productText += `📏 Доступні розміри: ${variants.sizes.join(', ')}\n`
+          }
+          if (variants.colors || variants.sizes) {
+            productText += `\n`
+          }
+        } catch (e) {
+          // If description is not JSON, show it as is
+          productText += `📝 ${product.description}\n\n`
+        }
       }
+      
       productText += `💰 Ціна: ${price}₴`
       if (originalPrice) {
         productText += ` ~~${originalPrice}₴~~`
@@ -245,9 +311,26 @@ XXL - грудь: 102-106 см, талія: 82-86 см`
       const originalPrice = product.sale_price ? product.price : null
 
       let productText = `🛍 ${product.name}\n\n`
+      
+      // Parse and display colors and sizes in user-friendly format
       if (product.description) {
-        productText += `📝 ${product.description}\n\n`
+        try {
+          const variants = JSON.parse(product.description)
+          if (variants.colors && variants.colors.length > 0) {
+            productText += `🎨 Доступні кольори: ${variants.colors.join(', ')}\n`
+          }
+          if (variants.sizes && variants.sizes.length > 0) {
+            productText += `📏 Доступні розміри: ${variants.sizes.join(', ')}\n`
+          }
+          if (variants.colors || variants.sizes) {
+            productText += `\n`
+          }
+        } catch (e) {
+          // If description is not JSON, show it as is
+          productText += `📝 ${product.description}\n\n`
+        }
       }
+      
       productText += `💰 Ціна: ${price}₴`
       if (originalPrice) {
         productText += ` ~~${originalPrice}₴~~`
@@ -318,6 +401,26 @@ XXL - грудь: 102-106 см, талія: 82-86 см`
 
     try {
       switch (previousState.type) {
+        case 'browse_mode_selection': {
+          const keyboard = {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '📋 Обрати з каталогу', callback_data: 'browse_manual' },
+                  { text: '🤖 AI помічник', callback_data: 'browse_ai' }
+                ],
+                [{ text: messages.main_menu_btn, callback_data: 'main_menu' }]
+              ]
+            }
+          }
+
+          await ctx.editMessageText(`🛍 Оберіть спосіб пошуку товарів:
+
+📋 **Обрати з каталогу** - переглядайте товари по категоріях
+🤖 **AI помічник** - опишіть, що ви шукаєте, і я допоможу підібрати`, keyboard)
+          break
+        }
+
         case 'categories': {
           const categories = await db.all(`
             SELECT id, name, description 
@@ -333,7 +436,7 @@ XXL - грудь: 102-106 см, талія: 82-86 см`
                   text: cat.name,
                   callback_data: `category_${cat.id}`
                 }]),
-                [{ text: messages.main_menu_btn, callback_data: 'main_menu' }]
+                [{ text: messages.back, callback_data: 'back' }]
               ]
             }
           }

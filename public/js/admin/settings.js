@@ -96,11 +96,11 @@ $(document).ready(function() {
         const file = fileInput.files[0];
         
         if (!file) {
-            alert('Please select a SQL file to restore');
+            alert('Будь ласка, виберіть SQL файл для відновлення');
             return;
         }
         
-        if (!confirm('Are you sure you want to restore the database? This will overwrite existing data.')) {
+        if (!confirm('Ви впевнені, що хочете відновити базу даних? Це перезапише існуючі дані.')) {
             return;
         }
         
@@ -109,7 +109,7 @@ $(document).ready(function() {
         
         const button = $(this).find('button[type="submit"]');
         const originalText = button.html();
-        button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Restoring...');
+        button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Відновлення...');
         
         $.ajax({
             url: '/admin/settings/restore',
@@ -122,12 +122,12 @@ $(document).ready(function() {
                     alert(response.success + '\n' + response.details);
                     location.reload();
                 } else {
-                    alert(response.error || 'Restore failed');
+                    alert(response.error || 'Відновлення не вдалося');
                 }
             },
             error: function(xhr) {
                 const response = xhr.responseJSON;
-                alert(response?.error || 'Restore failed');
+                alert(response?.error || 'Відновлення не вдалося');
             },
             complete: function() {
                 button.prop('disabled', false).html(originalText);
