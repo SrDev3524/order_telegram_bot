@@ -7,9 +7,8 @@ class Database {
   }
 
   async connect() {
-    if (this.pool) {
-      await this.pool.end()
-      this.pool = null
+    if (this.pool && !this.pool._closed) {
+      return this.pool
     }
 
     try {
@@ -21,13 +20,16 @@ class Database {
         database: process.env.DB_NAME || 'vidoma_bot',
         waitForConnections: true,
         connectionLimit: 10,
-        queueLimit: 0
+        queueLimit: 0,
+        acquireTimeout: 60000,
+        timeout: 60000,
+        reconnect: true
       })
 
-      // Test the connection
       const connection = await this.pool.getConnection()
       console.log('Connected to MySQL database')
       connection.release()
+      return this.pool
     } catch (err) {
       console.error('Error connecting to database:', err)
       throw err
@@ -36,11 +38,12 @@ class Database {
 
   async run(sql, params = []) {
     try {
+      await this.connect()
       const [result] = await this.pool.execute(sql, params)
-      return { 
-        id: result.insertId || null, 
+      return {
+        lastID: result.insertId || null,
         changes: result.affectedRows || 0,
-        result: result
+        result
       }
     } catch (err) {
       console.error('Database run error:', err)
@@ -50,6 +53,7 @@ class Database {
 
   async get(sql, params = []) {
     try {
+      await this.connect()
       const [rows] = await this.pool.execute(sql, params)
       return rows.length > 0 ? rows[0] : null
     } catch (err) {
@@ -60,6 +64,7 @@ class Database {
 
   async all(sql, params = []) {
     try {
+      await this.connect()
       const [rows] = await this.pool.execute(sql, params)
       return rows
     } catch (err) {

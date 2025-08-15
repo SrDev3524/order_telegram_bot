@@ -43,12 +43,9 @@ class CRMService {
         }
       )
 
-      console.log('CRM Payload novaposhta:', JSON.stringify(payload.novaposhta, null, 2))
-      console.log('CRM Response:', response.data)
-
       return {
         success: true,
-        orderId: response.data.id || response.data.order_id || Date.now(),
+        orderId: response.data.id || response.data.order_id,
         data: response.data
       }
     } catch (error) {
@@ -76,8 +73,6 @@ class CRMService {
           timeout: 15000
         }
       )
-
-      console.log('Order list response:', response.data)
 
       return {
         success: true,

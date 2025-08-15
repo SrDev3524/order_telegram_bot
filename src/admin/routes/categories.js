@@ -34,7 +34,6 @@ const upload = multer({
 
 router.get('/', async(req, res) => {
   try {
-    await db.connect()
     const categories = await db.getCategories(true)
     const categoryTree = await db.getCategoryTree()
 
@@ -62,8 +61,7 @@ router.get('/', async(req, res) => {
 
 router.get('/api', async(req, res) => {
   try {
-    await db.connect()
-    const categories = await db.getCategories(req.query.includeInactive === 'true')
+        const categories = await db.getCategories(req.query.includeInactive === 'true')
     res.json(categories)
   } catch (error) {
     console.error('Error fetching categories API:', error)
@@ -73,8 +71,7 @@ router.get('/api', async(req, res) => {
 
 router.get('/api/:id', async(req, res) => {
   try {
-    await db.connect()
-    const category = await db.getCategoryById(req.params.id)
+        const category = await db.getCategoryById(req.params.id)
     if (!category) {
       return res.status(404).json({ error: 'Category not found' })
     }
@@ -87,8 +84,6 @@ router.get('/api/:id', async(req, res) => {
 
 router.post('/', upload.single('image'), async(req, res) => {
   try {
-    await db.connect()
-
     const { name, description, parent_id, sort_order, active } = req.body
 
     if (!name || name.trim() === '') {
@@ -114,8 +109,6 @@ router.post('/', upload.single('image'), async(req, res) => {
 
 router.put('/:id', upload.single('image'), async(req, res) => {
   try {
-    await db.connect()
-
     const { name, description, parent_id, sort_order, active } = req.body
     const categoryId = req.params.id
 
@@ -147,8 +140,6 @@ router.put('/:id', upload.single('image'), async(req, res) => {
 
 router.delete('/:id', async(req, res) => {
   try {
-    await db.connect()
-
     const categoryId = req.params.id
     const { permanent } = req.body
 
@@ -173,8 +164,7 @@ router.delete('/:id', async(req, res) => {
 router.get('/:id/products-count', async(req, res) => {
   try {
     console.log(`Getting product count for category ID: ${req.params.id}`)
-    await db.connect()
-    console.log('Database connected successfully')
+        console.log('Database connected successfully')
     const count = await db.getCategoryProductCount(req.params.id)
     console.log(`Product count result: ${count}`)
     res.json({ count })
@@ -187,8 +177,7 @@ router.get('/:id/products-count', async(req, res) => {
 
 router.get('/tree', async(req, res) => {
   try {
-    await db.connect()
-    const tree = await db.getCategoryTree()
+        const tree = await db.getCategoryTree()
     res.json(tree)
   } catch (error) {
     console.error('Error fetching category tree:', error)

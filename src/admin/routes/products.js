@@ -5,13 +5,10 @@ const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
 
-// Ensure upload directory exists
 const uploadDir = path.join(__dirname, '../../../public/uploads/products/')
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true })
 }
-
-// Configure multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir)
@@ -34,10 +31,8 @@ const upload = multer({
   }
 })
 
-// GET - Display products page
 router.get('/', async(req, res) => {
   try {
-    await db.connect()
 
     const [products, categories] = await Promise.all([
       db.all(`
@@ -77,7 +72,6 @@ router.get('/', async(req, res) => {
 
 router.get('/api/:id', async(req, res) => {
   try {
-    await db.connect()
 
     const product = await db.get(
       'SELECT * FROM products WHERE id = ?',
@@ -95,9 +89,8 @@ router.get('/api/:id', async(req, res) => {
   }
 })
 
-router.post('/', upload.array('images', 5), async(req, res) => {
+router.post('/', upload.array('images', 20), async(req, res) => {
   try {
-    await db.connect()
 
     const { name, description, sku, price, sale_price, stock_quantity, category_id, active } = req.body
     const images = req.files ? req.files.map(file => `/uploads/products/${file.filename}`) : []
@@ -132,10 +125,8 @@ router.post('/', upload.array('images', 5), async(req, res) => {
   }
 })
 
-router.put('/:id', upload.array('images', 5), async(req, res) => {
+router.put('/:id', upload.array('images', 20), async(req, res) => {
   try {
-    await db.connect()
-
     const productId = req.params.id
     const { name, description, sku, price, sale_price, stock_quantity, category_id, active } = req.body
 
@@ -164,10 +155,25 @@ router.put('/:id', upload.array('images', 5), async(req, res) => {
       active === 'on' || active === '1' ? 1 : 0
     ]
 
+    let finalImages = []
+
+    if (req.body.existingImages) {
+      try {
+        finalImages = JSON.parse(req.body.existingImages)
+      } catch (e) {
+        console.log('Error parsing existing images from form:', e)
+        finalImages = []
+      }
+    }
+
     if (req.files && req.files.length > 0) {
       const newImages = req.files.map(file => `/uploads/products/${file.filename}`)
+      finalImages = [...finalImages, ...newImages]
+    }
+
+    if (finalImages.length > 0 || req.body.existingImages) {
       updateQuery += ', images = ?'
-      queryParams.push(JSON.stringify(newImages))
+      queryParams.push(JSON.stringify(finalImages))
     }
 
     updateQuery += ' WHERE id = ?'
@@ -186,10 +192,54 @@ router.put('/:id', upload.array('images', 5), async(req, res) => {
   }
 })
 
+router.delete('/:id/photo', async(req, res) => {
+  try {
+    const productId = req.params.id
+    const { photoPath } = req.body
+
+    if (!photoPath) {
+      return res.status(400).json({ error: 'Photo path is required' })
+    }
+
+    const product = await db.get('SELECT * FROM products WHERE id = ?', [productId])
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' })
+    }
+
+    let images = []
+    try {
+      if (product.images) {
+        images = JSON.parse(product.images)
+      }
+    } catch (e) {
+      images = product.images ? [product.images] : []
+    }
+
+    const updatedImages = images.filter(img => img !== photoPath)
+
+    await db.run(
+      'UPDATE products SET images = ? WHERE id = ?',
+      [JSON.stringify(updatedImages), productId]
+    )
+
+    const fullPath = path.join(__dirname, '../../../public', photoPath)
+    if (fs.existsSync(fullPath)) {
+      try {
+        fs.unlinkSync(fullPath)
+      } catch (fileError) {
+        console.warn('Could not delete physical file:', fileError.message)
+      }
+    }
+
+    res.json({ message: 'Photo deleted successfully', remainingPhotos: updatedImages.length })
+  } catch (error) {
+    console.error('Error deleting photo:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
 router.delete('/:id', async(req, res) => {
   try {
-    await db.connect()
-
     const product = await db.get('SELECT * FROM products WHERE id = ?', [req.params.id])
     if (!product) {
       return res.status(404).json({ error: 'Product not found' })

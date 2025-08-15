@@ -12,9 +12,150 @@ const messages = {
   main_menu_btn: '🏠 Головне меню'
 }
 
+// Helper functions to reduce code duplication
+function createProductKeyboard(productId) {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '📏 Довідка розмірів', callback_data: `size_help_${productId}` }],
+        [{ text: '🛒 Замовити', callback_data: `order_${productId}` }],
+        [{ text: messages.back, callback_data: 'back' }]
+      ]
+    }
+  }
+}
+
+function formatProductText(product) {
+  const price = product.sale_price || product.price
+  const originalPrice = product.sale_price ? product.price : null
+
+  let productText = `🛍 ${product.name}\n\n`
+
+  // Parse and display colors and sizes
+  if (product.description) {
+    try {
+      const variants = JSON.parse(product.description)
+      if (variants.colors && variants.colors.length > 0) {
+        productText += `🎨 Доступні кольори: ${variants.colors.join(', ')}\n`
+      }
+      if (variants.sizes && variants.sizes.length > 0) {
+        productText += `📏 Доступні розміри: ${variants.sizes.join(', ')}\n`
+      }
+      if (variants.colors || variants.sizes) {
+        productText += '\n'
+      }
+    } catch (e) {
+      productText += `📝 ${product.description}\n\n`
+    }
+  }
+
+  productText += `💰 Ціна: ${price}₴`
+  if (originalPrice) {
+    productText += ` ~~${originalPrice}₴~~`
+  }
+  productText += `\n📦 В наявності: ${product.stock_quantity} шт.`
+
+  return productText
+}
+
+async function getProductWithCategory(productId) {
+  return await db.get(`
+    SELECT p.*, c.name as category_name 
+    FROM products p 
+    LEFT JOIN categories c ON p.category_id = c.id 
+    WHERE p.id = ?
+  `, [productId])
+}
+
+async function sendProductWithImages(ctx, product, productText, keyboard, deleteMessage = false, photoPage = 0) {
+  let images = []
+  try {
+    if (product.images) {
+      if (typeof product.images === 'string') {
+        if (product.images.startsWith('/') || product.images.startsWith('http')) {
+          images = [product.images]
+        } else {
+          images = JSON.parse(product.images)
+        }
+      } else if (Array.isArray(product.images)) {
+        images = product.images
+      }
+    }
+  } catch (e) {
+    console.log('Error parsing images, treating as single path:', product.images)
+    images = [product.images]
+  }
+
+  const validImages = []
+  for (const image of images) {
+    const imagePath = path.join(__dirname, '../../../public', image)
+    if (fs.existsSync(imagePath)) {
+      validImages.push(imagePath)
+    }
+  }
+
+  if (validImages.length > 0) {
+    try {
+      if (deleteMessage) {
+        await ctx.deleteMessage()
+      }
+
+      if (validImages.length === 1) {
+        await ctx.replyWithPhoto(
+          { source: validImages[0] },
+          { caption: productText, ...keyboard }
+        )
+      } else {
+        const photosPerPage = 10
+        const startIndex = photoPage * photosPerPage
+        const endIndex = Math.min(startIndex + photosPerPage, validImages.length)
+        const photosToShow = validImages.slice(startIndex, endIndex)
+
+        const mediaGroup = photosToShow.map((imagePath, index) => ({
+          type: 'photo',
+          media: { source: imagePath },
+          caption: index === 0 ? `📸 Фото товару "${product.name}" (${startIndex + 1}-${endIndex} з ${validImages.length})` : undefined
+        }))
+
+        await ctx.replyWithMediaGroup(mediaGroup)
+
+        const photoNavigation = []
+        if (validImages.length > photosPerPage) {
+          const navigationRow = []
+          if (photoPage > 0) {
+            navigationRow.push({ text: '⬅️ Попередні фото', callback_data: `product_${product.id}_photos_${photoPage - 1}` })
+          }
+          if (endIndex < validImages.length) {
+            navigationRow.push({ text: 'Наступні фото ➡️', callback_data: `product_${product.id}_photos_${photoPage + 1}` })
+          }
+          if (navigationRow.length > 0) {
+            photoNavigation.push(navigationRow)
+          }
+        }
+
+        if (photoNavigation.length > 0) {
+          if (keyboard.reply_markup && keyboard.reply_markup.inline_keyboard) {
+            keyboard.reply_markup.inline_keyboard = [...photoNavigation, ...keyboard.reply_markup.inline_keyboard]
+          } else {
+            keyboard.reply_markup = {
+              inline_keyboard: photoNavigation
+            }
+          }
+        }
+
+        await ctx.reply(productText, keyboard)
+      }
+      return true
+    } catch (imgError) {
+      console.log('Failed to send images, sending text instead:', imgError)
+    }
+  }
+
+  return false
+}
+
 function setupProductHandlers(bot) {
-  // Handle "Browse Products" button
-  bot.hears('🛍 Browse Products', async(ctx) => {
+  bot.hears('🛍 Переглянути товари', async(ctx) => {
     try {
       ctx.session.navigationStack = [{ type: 'browse_mode_selection' }]
 
@@ -30,17 +171,16 @@ function setupProductHandlers(bot) {
         }
       }
 
-      await ctx.reply(`🛍 Оберіть спосіб пошуку товарів:
+      await ctx.reply(`🛍 Обирайте, як зручніше шукати покупки:
 
-📋 **Обрати з каталогу** - переглядайте товари по категоріях
-🤖 **AI помічник** - опишіть, що ви шукаєте, і я допоможу підібрати`, keyboard)
+📋 Каталог товарів – гортайте та знаходьте улюблене
+🤖  AI-помічник – розкажіть, що шукаєте, а я підберу найкраще `, keyboard)
     } catch (error) {
       console.error('Error showing browse options:', error)
       await ctx.reply('Сталася помилка.')
     }
   })
 
-  // Handle manual browsing selection
   bot.action('browse_manual', async(ctx) => {
     try {
       const categories = await db.all(`
@@ -76,7 +216,6 @@ function setupProductHandlers(bot) {
     }
   })
 
-  // Handle AI assistant selection
   bot.action('browse_ai', async(ctx) => {
     try {
       ctx.session.aiSearchMode = true
@@ -85,12 +224,11 @@ function setupProductHandlers(bot) {
 Опишіть, що ви шукаєте. Наприклад:
 • "Я хочу нічну сорочку"
 • "Покажи мереживні комплекти"
-• "Що у вас є для дому?"
+• «Шовковий халат»
 
-Просто напишіть своє побажання, і я допоможу підібрати товари з нашого каталогу.
+Просто опишіть своє бажання — і я підберу найкращі варіанти з нашого каталогу ❤️ 
+🏠 Щоб повернутися до головного меню, наберіть /start`)
 
-Для повернення до головного меню використайте /start`)
-      
       await ctx.answerCbQuery()
     } catch (error) {
       console.error('Error activating AI mode:', error)
@@ -98,7 +236,6 @@ function setupProductHandlers(bot) {
     }
   })
 
-  // Category selection
   bot.action(/category_(\d+)/, async(ctx) => {
     const categoryId = parseInt(ctx.match[1])
 
@@ -151,17 +288,35 @@ function setupProductHandlers(bot) {
     }
   })
 
-  // Product details
+  // Photo navigation handler - MUST come before the general product handler
+  bot.action(/product_(\d+)_photos_(\d+)/, async(ctx) => {
+    await ctx.answerCbQuery()
+    const productId = parseInt(ctx.match[1])
+    const photoPage = parseInt(ctx.match[2])
+
+    try {
+      const product = await getProductWithCategory(productId)
+
+      if (!product) {
+        await ctx.reply('Цей товар не знайдено.')
+        return
+      }
+
+      const productText = formatProductText(product)
+      const keyboard = createProductKeyboard(productId)
+
+      await sendProductWithImages(ctx, product, productText, keyboard, true, photoPage)
+    } catch (error) {
+      console.error('Error loading product photos:', error)
+      await ctx.reply('Сталася помилка завантаження фото.')
+    }
+  })
+
   bot.action(/product_(\d+)/, async(ctx) => {
     const productId = parseInt(ctx.match[1])
 
     try {
-      const product = await db.get(`
-        SELECT p.*, c.name as category_name 
-        FROM products p 
-        LEFT JOIN categories c ON p.category_id = c.id 
-        WHERE p.id = ?
-      `, [productId])
+      const product = await getProductWithCategory(productId)
 
       if (!product) {
         await ctx.editMessageText('Цей товар не знайдено.')
@@ -170,84 +325,14 @@ function setupProductHandlers(bot) {
 
       ctx.session.navigationStack.push({ type: 'product_details', productId })
 
-      const price = product.sale_price || product.price
-      const originalPrice = product.sale_price ? product.price : null
+      const productText = formatProductText(product)
+      const keyboard = createProductKeyboard(productId)
 
-      let productText = `🛍 ${product.name}\n\n`
-      
-      // Parse and display colors and sizes in user-friendly format
-      if (product.description) {
-        try {
-          const variants = JSON.parse(product.description)
-          if (variants.colors && variants.colors.length > 0) {
-            productText += `🎨 Доступні кольори: ${variants.colors.join(', ')}\n`
-          }
-          if (variants.sizes && variants.sizes.length > 0) {
-            productText += `📏 Доступні розміри: ${variants.sizes.join(', ')}\n`
-          }
-          if (variants.colors || variants.sizes) {
-            productText += `\n`
-          }
-        } catch (e) {
-          // If description is not JSON, show it as is
-          productText += `📝 ${product.description}\n\n`
-        }
-      }
-      
-      productText += `💰 Ціна: ${price}₴`
-      if (originalPrice) {
-        productText += ` ~~${originalPrice}₴~~`
-      }
-      productText += `\n📦 В наявності: ${product.stock_quantity} шт.`
+      const imageSent = await sendProductWithImages(ctx, product, productText, keyboard, true)
 
-      const keyboard = {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '📏 Size Help', callback_data: `size_help_${productId}` }],
-            [{ text: '🛒 Order', callback_data: `order_${productId}` }],
-            [{ text: messages.back, callback_data: 'back' }]
-          ]
-        }
+      if (!imageSent) {
+        await ctx.editMessageText(productText, keyboard)
       }
-
-      // Try to send product image if available
-      let images = []
-      try {
-        if (product.images) {
-          if (typeof product.images === 'string') {
-            // Check if it's already a path (not JSON)
-            if (product.images.startsWith('/') || product.images.startsWith('http')) {
-              images = [product.images]
-            } else {
-              // Try to parse as JSON
-              images = JSON.parse(product.images)
-            }
-          } else if (Array.isArray(product.images)) {
-            images = product.images
-          }
-        }
-      } catch (e) {
-        console.log('Error parsing images, treating as single path:', product.images)
-        images = [product.images]
-      }
-
-      if (images.length > 0) {
-        const imagePath = path.join(__dirname, '../../../public', images[0])
-        if (fs.existsSync(imagePath)) {
-          try {
-            await ctx.deleteMessage()
-            await ctx.replyWithPhoto(
-              { source: imagePath },
-              { caption: productText, ...keyboard }
-            )
-            return
-          } catch (imgError) {
-            console.log('Failed to send image, sending text instead')
-          }
-        }
-      }
-
-      await ctx.editMessageText(productText, keyboard)
     } catch (error) {
       console.error('Error loading product:', error)
       await ctx.editMessageText('Сталася помилка завантаження товару.')
@@ -295,95 +380,21 @@ XXL - грудь: 102-106 см, талія: 82-86 см`
 
     // Redirect to product details without modifying navigation stack
     try {
-      const product = await db.get(`
-        SELECT p.*, c.name as category_name 
-        FROM products p 
-        LEFT JOIN categories c ON p.category_id = c.id 
-        WHERE p.id = ?
-      `, [productId])
+      const product = await getProductWithCategory(productId)
 
       if (!product) {
         await ctx.reply('Цей товар не знайдено.')
         return
       }
 
-      const price = product.sale_price || product.price
-      const originalPrice = product.sale_price ? product.price : null
+      const productText = formatProductText(product)
+      const keyboard = createProductKeyboard(productId)
 
-      let productText = `🛍 ${product.name}\n\n`
-      
-      // Parse and display colors and sizes in user-friendly format
-      if (product.description) {
-        try {
-          const variants = JSON.parse(product.description)
-          if (variants.colors && variants.colors.length > 0) {
-            productText += `🎨 Доступні кольори: ${variants.colors.join(', ')}\n`
-          }
-          if (variants.sizes && variants.sizes.length > 0) {
-            productText += `📏 Доступні розміри: ${variants.sizes.join(', ')}\n`
-          }
-          if (variants.colors || variants.sizes) {
-            productText += `\n`
-          }
-        } catch (e) {
-          // If description is not JSON, show it as is
-          productText += `📝 ${product.description}\n\n`
-        }
-      }
-      
-      productText += `💰 Ціна: ${price}₴`
-      if (originalPrice) {
-        productText += ` ~~${originalPrice}₴~~`
-      }
-      productText += `\n📦 В наявності: ${product.stock_quantity} шт.`
+      const imageSent = await sendProductWithImages(ctx, product, productText, keyboard, false)
 
-      const keyboard = {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '📏 Size Help', callback_data: `size_help_${productId}` }],
-            [{ text: '🛒 Order', callback_data: `order_${productId}` }],
-            [{ text: messages.back, callback_data: 'back' }]
-          ]
-        }
+      if (!imageSent) {
+        await ctx.reply(productText, keyboard)
       }
-
-      // Try to send product image if available
-      let images = []
-      try {
-        if (product.images) {
-          if (typeof product.images === 'string') {
-            // Check if it's already a path (not JSON)
-            if (product.images.startsWith('/') || product.images.startsWith('http')) {
-              images = [product.images]
-            } else {
-              // Try to parse as JSON
-              images = JSON.parse(product.images)
-            }
-          } else if (Array.isArray(product.images)) {
-            images = product.images
-          }
-        }
-      } catch (e) {
-        console.log('Error parsing images, treating as single path:', product.images)
-        images = [product.images]
-      }
-
-      if (images.length > 0) {
-        const imagePath = path.join(__dirname, '../../../public', images[0])
-        if (fs.existsSync(imagePath)) {
-          try {
-            await ctx.replyWithPhoto(
-              { source: imagePath },
-              { caption: productText, ...keyboard }
-            )
-            return
-          } catch (imgError) {
-            console.log('Failed to send image, sending text instead')
-          }
-        }
-      }
-
-      await ctx.reply(productText, keyboard)
     } catch (error) {
       console.error('Error loading product:', error)
       await ctx.reply('Сталася помилка завантаження товару.')

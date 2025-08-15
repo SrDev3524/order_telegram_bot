@@ -193,11 +193,11 @@ router.get('/backup', async(req, res) => {
   try {
     const { dateFrom, dateTo } = req.query
     const backup = await backupService.generateBackup(dateFrom, dateTo)
-    
+
     res.setHeader('Content-Type', 'application/sql')
     res.setHeader('Content-Disposition', `attachment; filename="${backup.filename}"`)
     res.setHeader('Content-Length', backup.size)
-    
+
     res.send(backup.content)
   } catch (error) {
     console.error('Backup error:', error)
@@ -216,8 +216,8 @@ router.post('/restore', upload.single('sqlFile'), async(req, res) => {
 
     const sqlContent = req.file.buffer.toString('utf8')
     const result = await backupService.restoreBackup(sqlContent)
-    
-    res.json({ 
+
+    res.json({
       success: 'Database restored successfully',
       details: `Executed ${result.executedStatements} of ${result.totalStatements} statements`
     })

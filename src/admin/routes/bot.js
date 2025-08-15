@@ -3,7 +3,7 @@ const router = express.Router()
 const botControl = require('../../services/botControl')
 
 // Bot status page
-router.get('/', async (req, res) => {
+router.get('/', async(req, res) => {
   try {
     const status = botControl.getStatus()
     res.render('bot', {
@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
 })
 
 // Start bot
-router.post('/start', async (req, res) => {
+router.post('/start', async(req, res) => {
   try {
     const result = await botControl.startBot()
     res.json({ success: result.message })
@@ -41,7 +41,7 @@ router.post('/start', async (req, res) => {
 })
 
 // Stop bot
-router.post('/stop', async (req, res) => {
+router.post('/stop', async(req, res) => {
   try {
     const result = await botControl.stopBot()
     res.json({ success: result.message })
@@ -52,7 +52,7 @@ router.post('/stop', async (req, res) => {
 })
 
 // Restart bot
-router.post('/restart', async (req, res) => {
+router.post('/restart', async(req, res) => {
   try {
     const result = await botControl.restartBot()
     res.json({ success: result.message })
@@ -63,7 +63,7 @@ router.post('/restart', async (req, res) => {
 })
 
 // Get bot status (API)
-router.get('/status', async (req, res) => {
+router.get('/status', async(req, res) => {
   try {
     const status = botControl.getStatus()
     res.json({

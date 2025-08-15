@@ -1,39 +1,35 @@
+let ProductManager;
+
 $(document).ready(function() {
-    const ProductManager = {
+    ProductManager = {
+        currentExistingImages: [],
+        
         init() {
             this.bindEvents()
         },
 
         bindEvents() {
-            // Add product button
             $('#addProductBtn').on('click', () => this.showAddModal())
-            
-            // Edit product buttons
             $(document).on('click', '.edit-product', (e) => {
                 const productId = $(e.currentTarget).data('product-id')
                 this.showEditModal(productId)
             })
-            
-            // Delete product buttons
             $(document).on('click', '.delete-product', (e) => {
                 const productId = $(e.currentTarget).data('product-id')
                 const productName = $(e.currentTarget).data('product-name')
                 this.showDeleteModal(productId, productName)
             })
-            
-            // Form submission
             $('#productForm').on('submit', (e) => this.handleFormSubmit(e))
-            
-            // Delete confirmation
             $('#confirmDeleteProduct').on('click', () => this.confirmDelete())
-            
-            // Image preview
             $('#productImages').on('change', (e) => this.previewImages(e))
+            $('#productModal').on('hidden.bs.modal', () => {
+                this.resetForm()
+            })
         },
 
         showAddModal() {
             this.resetForm()
-            $('#productModalTitle').text('Додати товар')
+            $('#productModalTitle').text('Add Product')
             $('#productForm').attr('action', '/admin/products').attr('method', 'POST')
             $('#productModal').modal('show')
         },
@@ -41,15 +37,13 @@ $(document).ready(function() {
         async showEditModal(productId) {
             try {
                 const response = await $.get(`/admin/products/api/${productId}`)
-                
-                
                 this.resetForm()
                 this.populateForm(response)
-                $('#productModalTitle').text('Редагувати товар')
+                $('#productModalTitle').text('Edit Product')
                 $('#productForm').removeAttr('action').removeAttr('method')
                 $('#productModal').modal('show')
             } catch (error) {
-                this.showAlert('error', 'Помилка завантаження товару: ' + error.message)
+                this.showAlert('error', 'Error loading product: ' + error.message)
             }
         },
 
@@ -63,83 +57,109 @@ $(document).ready(function() {
             $('#productForm')[0].reset()
             $('#productId').val('')
             $('#imagePreviewContainer').empty()
+            $('#existingImagesData').remove()
+            $('#productModal .alert').remove()
+            $('#productForm button[type="submit"]').html('Save').prop('disabled', false)
+            this.currentExistingImages = []
         },
 
         populateForm(product) {
-            
-            // Populate all form fields with exact matches
             $('#productId').val(product.id || '')
             $('#productName').val(product.name || '')
             $('#productDescription').val(product.description || '')
             $('#productCategory').val(product.category_id || '')
             $('#productSku').val(product.sku || '')
-            
-            // Make sure price fields are properly set
             $('#productPrice').val(product.price || '')
             $('#salePrice').val(product.sale_price || '')
             $('#productStock').val(product.stock_quantity || 0)
-            
-            // Handle checkbox properly
             $('#productActive').prop('checked', product.active === 1 || product.active === true)
             
-            
-            // Show existing images
             if (product.images) {
                 try {
                     const images = typeof product.images === 'string' 
                         ? JSON.parse(product.images) 
                         : product.images
                     if (Array.isArray(images) && images.length > 0) {
-                        this.showExistingImages(images)
+                        this.currentExistingImages = images
+                        this.showAllImages()
                     }
                 } catch (e) {
+                    console.error('Error parsing existing images:', e)
                 }
             }
         },
 
-        showExistingImages(images) {
+        showAllImages() {
             const container = $('#imagePreviewContainer')
             container.empty()
             
-            images.forEach(imagePath => {
+            $('#existingImagesData').remove()
+            $('<input>').attr({
+                type: 'hidden',
+                id: 'existingImagesData',
+                name: 'existingImages',
+                value: JSON.stringify(this.currentExistingImages)
+            }).appendTo('#productForm')
+            
+            this.currentExistingImages.forEach((imagePath, index) => {
                 const imageHtml = `
-                    <div class="existing-image mb-2">
+                    <div class="image-item d-inline-block me-2 mb-2 position-relative">
                         <img src="${imagePath}" alt="Product image" 
                              class="img-thumbnail" style="width: 100px; height: 100px; object-fit: cover;">
+                        <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0" 
+                                onclick="ProductManager.removeImage(${index})"
+                                style="padding: 2px 6px; font-size: 12px;">
+                            ×
+                        </button>
                     </div>
                 `
                 container.append(imageHtml)
             })
+            
+            const files = $('#productImages')[0].files
+            Array.from(files).forEach((file) => {
+                this.addNewImagePreview(file, container)
+            })
+        },
+        
+        addNewImagePreview(file, container) {
+            if (!file.type.startsWith('image/')) return
+            
+            const reader = new FileReader()
+            reader.onload = (e) => {
+                const imageHtml = `
+                    <div class="image-item d-inline-block me-2 mb-2 position-relative new-image">
+                        <img src="${e.target.result}" alt="New image" 
+                             class="img-thumbnail" style="width: 100px; height: 100px; object-fit: cover;">
+                        <button type="button" class="btn btn-sm btn-warning position-absolute top-0 end-0" 
+                                onclick="ProductManager.removeNewImage(this)"
+                                style="padding: 2px 6px; font-size: 12px;">
+                            ×
+                        </button>
+                    </div>
+                `
+                container.append(imageHtml)
+            }
+            reader.readAsDataURL(file)
+        },
+        
+        removeImage(index) {
+            this.currentExistingImages.splice(index, 1)
+            this.showAllImages()
+        },
+        
+        removeNewImage(button) {
+            $(button).closest('.new-image').remove()
         },
 
         previewImages(event) {
-            const container = $('#imagePreviewContainer')
-            container.find('.new-image').remove()
-            
-            const files = event.target.files
-            
-            Array.from(files).forEach(file => {
-                if (file.type.startsWith('image/')) {
-                    const reader = new FileReader()
-                    reader.onload = (e) => {
-                        const imageHtml = `
-                            <div class="new-image mb-2">
-                                <img src="${e.target.result}" alt="Preview" 
-                                     class="img-thumbnail" style="width: 100px; height: 100px; object-fit: cover;">
-                            </div>
-                        `
-                        container.append(imageHtml)
-                    }
-                    reader.readAsDataURL(file)
-                }
-            })
+            this.showAllImages()
         },
 
         async handleFormSubmit(e) {
             const productId = $('#productId').val()
             const isEdit = !!productId
             
-            // For new products, let the form submit normally
             if (!isEdit) {
                 const name = $('#productName').val().trim()
                 const price = $('#productPrice').val()
@@ -147,22 +167,18 @@ $(document).ready(function() {
                 
                 if (!name || !price || !categoryId) {
                     e.preventDefault()
-                    this.showAlert('error', 'Заповніть всі обовʼязкові поля')
+                    this.showAlert('error', 'Please fill all required fields')
                     return false
                 }
-                
-                return true // Allow normal form submission
+                return true
             }
             
-            // For edit mode, handle with AJAX
             e.preventDefault()
-            
             const submitBtn = $('#productForm button[type="submit"]')
-            submitBtn.prop('disabled', true)
+            submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...')
             
             try {
                 const formData = new FormData(e.target)
-                
                 
                 const response = await $.ajax({
                     url: `/admin/products/${productId}`,
@@ -172,15 +188,20 @@ $(document).ready(function() {
                     contentType: false
                 })
                 
-                this.showAlert('success', response.message)
-                $('#productModal').modal('hide')
-                setTimeout(() => window.location.reload(), 1500)
+                this.showModalAlert('success', 'Product saved successfully!')
+                $('#productImages').val('')
+                
+                const updatedProduct = await $.get(`/admin/products/api/${productId}`)
+                this.currentExistingImages = JSON.parse(updatedProduct.images || '[]')
+                this.showAllImages()
+                
+                this.updateProductRow(productId, formData)
                 
             } catch (error) {
-                const message = error.responseJSON?.error || 'Помилка збереження товару'
-                this.showAlert('error', message)
+                const message = error.responseJSON?.error || 'Error saving product'
+                this.showModalAlert('error', message)
             } finally {
-                submitBtn.prop('disabled', false)
+                submitBtn.html('Save').prop('disabled', false)
             }
         },
 
@@ -194,14 +215,14 @@ $(document).ready(function() {
                 })
                 
                 $('#deleteModal').modal('hide')
-                this.showAlert('success', 'Товар успішно видалено')
+                this.showAlert('success', 'Product deleted successfully')
                 
                 $(`tr[data-product-id="${productId}"]`).fadeOut(300, function() {
                     $(this).remove()
                 })
                 
             } catch (error) {
-                const message = error.responseJSON?.error || 'Помилка видалення товару'
+                const message = error.responseJSON?.error || 'Error deleting product'
                 this.showAlert('error', message)
             }
         },
@@ -214,9 +235,52 @@ $(document).ready(function() {
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             `
-            
             $('.alert').remove()
             $('.d-flex.justify-content-between').after(alertHtml)
+        },
+        
+        showModalAlert(type, message) {
+            const alertClass = type === 'success' ? 'alert-success' : 'alert-danger'
+            const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'
+            const alertHtml = `
+                <div class="alert ${alertClass} alert-dismissible fade show mt-3" role="alert">
+                    <i class="fas ${iconClass} me-2"></i>${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `
+            $('#productModal .alert').remove()
+            $('#productModal .modal-header').after(alertHtml)
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    $('#productModal .alert-success').fadeOut(500, function() {
+                        $(this).remove()
+                    })
+                }, 5000)
+            }
+        },
+        
+        updateProductRow(productId, formData) {
+            const row = $(`tr[data-product-id="${productId}"]`)
+            if (row.length) {
+                const name = formData.get('name')
+                const price = formData.get('price')
+                const stock = formData.get('stock_quantity')
+                const active = formData.get('active') === 'on'
+                
+                row.find('td:nth-child(3)').text(name)
+                row.find('td:nth-child(5)').text(price + '₴')
+                row.find('td:nth-child(7)').text(stock)
+                
+                const statusCell = row.find('td:nth-child(8)')
+                if (active) {
+                    statusCell.html('<span class="badge bg-success">Active</span>')
+                    row.removeClass('table-secondary')
+                } else {
+                    statusCell.html('<span class="badge bg-secondary">Inactive</span>')
+                    row.addClass('table-secondary')
+                }
+            }
         }
     }
     

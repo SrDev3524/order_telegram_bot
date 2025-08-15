@@ -18,7 +18,7 @@ class NovaPoshtaService {
           Language: 'UA'
         }
       })
-      
+
       if (response.data.errors && response.data.errors.length > 0) {
         console.error('Nova Poshta API Errors:', response.data.errors)
         return []

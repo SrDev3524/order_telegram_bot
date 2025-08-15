@@ -1,8 +1,8 @@
 const mainReplyKeyboard = {
   reply_markup: {
     keyboard: [
-      ['🛍 Browse Products', '📦 Order Status'],
-      ['💬 Manager', '❓ Help']
+      ['🛍 Переглянути товари', '📦 Статус замовлення'],
+      ['💬 Менеджер', '❓ Допомога']
     ],
     resize_keyboard: true,
     persistent: true

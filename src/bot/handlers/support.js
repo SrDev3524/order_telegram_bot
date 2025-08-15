@@ -1,7 +1,6 @@
 function setupSupportHandlers(bot) {
-
-  // Handle "Manager" button - show contact info only
-  bot.hears('💬 Manager', async(ctx) => {
+  // Handle "Менеджер" button - show contact info only
+  bot.hears('💬 Менеджер', async(ctx) => {
     const contactInfo = `💬 Зв'язок з менеджером
 
 📞 Телефон: +38 (095) 412-61-00

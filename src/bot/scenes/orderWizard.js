@@ -3,7 +3,6 @@ const db = require('../../database/connection')
 const crmService = require('../../services/crm')
 const novaPoshtaService = require('../../services/novaPoshta')
 
-// Helper function to clear all timeouts
 const clearAllTimeouts = (ctx) => {
   if (ctx.scene.state.timeoutId) {
     clearTimeout(ctx.scene.state.timeoutId)
@@ -11,13 +10,10 @@ const clearAllTimeouts = (ctx) => {
   }
 }
 
-// Helper function to set timeout
 const setOrderTimeout = (ctx) => {
-  // Clear any existing timeout first
   clearAllTimeouts(ctx)
 
   const timeoutId = setTimeout(() => {
-    // Clear the timeout immediately to prevent repeated messages
     clearAllTimeouts(ctx)
 
     ctx.reply(
@@ -28,7 +24,7 @@ const setOrderTimeout = (ctx) => {
       ])
     )
     ctx.scene.leave()
-  }, 300000) // 5 minutes
+  }, 300000)
 
   ctx.scene.state.timeoutId = timeoutId
 }
@@ -36,7 +32,6 @@ const setOrderTimeout = (ctx) => {
 const orderWizard = new Scenes.WizardScene(
   'order-wizard',
 
-  // Step 1: Color selection (if available)
   async(ctx) => {
     setOrderTimeout(ctx)
 
@@ -72,7 +67,7 @@ const orderWizard = new Scenes.WizardScene(
 
     // If product has colors, show color selection
     if (ctx.scene.state.availableColors.length > 0) {
-      const colorButtons = ctx.scene.state.availableColors.map(color => 
+      const colorButtons = ctx.scene.state.availableColors.map(color =>
         [Markup.button.callback(color, `color_${color}`)]
       )
 
@@ -101,13 +96,13 @@ const orderWizard = new Scenes.WizardScene(
         ctx.scene.state.selectedColor = colorMatch[1]
         await ctx.answerCbQuery()
       }
-      
+
       // Handle size guide
       if (ctx.callbackQuery.data === 'size_guide') {
         await ctx.answerCbQuery()
         const sizeButtons = []
         const sizesPerRow = 3
-        
+
         for (let i = 0; i < ctx.scene.state.availableSizes.length; i += sizesPerRow) {
           const row = ctx.scene.state.availableSizes
             .slice(i, i + sizesPerRow)
@@ -140,7 +135,7 @@ const orderWizard = new Scenes.WizardScene(
     if (ctx.scene.state.availableSizes.length > 0) {
       const sizeButtons = []
       const sizesPerRow = 3
-      
+
       for (let i = 0; i < ctx.scene.state.availableSizes.length; i += sizesPerRow) {
         const row = ctx.scene.state.availableSizes
           .slice(i, i + sizesPerRow)
@@ -148,7 +143,7 @@ const orderWizard = new Scenes.WizardScene(
         sizeButtons.push(row)
       }
 
-      let message = `📏 Оберіть розмір:`
+      let message = '📏 Оберіть розмір:'
       if (ctx.scene.state.selectedColor) {
         message = `Колір: ${ctx.scene.state.selectedColor}\n\n${message}`
       }
@@ -386,7 +381,7 @@ const orderWizard = new Scenes.WizardScene(
       await ctx.answerCbQuery()
 
       ctx.scene.state.waitingForWarehouseNumber = true
-      
+
       await ctx.editMessageText(
         `📦 Місто ${selectedCity.name} обрано.\n\n` +
         '✍️ Введіть номер відділення або поштомату Нова Пошта:\n\n' +
@@ -457,7 +452,7 @@ const orderWizard = new Scenes.WizardScene(
     // Handle manual warehouse number input
     if (ctx.scene.state.waitingForWarehouseNumber && ctx.message?.text) {
       const warehouseNumber = ctx.message.text.trim()
-      
+
       // Validate warehouse number format (1-5 digits)
       if (!/^\d{1,5}$/.test(warehouseNumber)) {
         await ctx.reply(
@@ -498,12 +493,12 @@ const orderWizard = new Scenes.WizardScene(
         ctx.scene.state.waitingForWarehouseNumber = false
 
         await ctx.reply(
-          `✅ Відділення підтверджено:\n` +
+          '✅ Відділення підтверджено:\n' +
           `📦 №${validWarehouse.number} - ${validWarehouse.description}\n\n` +
           '💳 Оберіть спосіб оплати:',
           Markup.inlineKeyboard([
-            [Markup.button.callback('📮 Післяплата', 'payment_postpaid')],
-            [Markup.button.callback('💳 Передоплата на карту', 'payment_prepaid')],
+            [Markup.button.callback('📮 Післяплата (наложка)', 'payment_postpaid')],
+            [Markup.button.callback('💳 Оплата на рахунок ФОП', 'payment_prepaid')],
             [Markup.button.callback('❌ Скасувати', 'cancel_order')]
           ])
         )
@@ -635,7 +630,7 @@ const orderWizard = new Scenes.WizardScene(
           // Prepare Nova Poshta data for CRM
           novaPoshta = novaPoshtaService.prepareForCRM(ctx.scene.state.selectedCity, ctx.scene.state.selectedWarehouse)
           deliveryAddress = `${ctx.scene.state.selectedCity.name}, відділення №${ctx.scene.state.selectedWarehouse.number}`
-          
+
           // Add postpaid field based on payment method
           if (paymentMethod === 'Післяплата') {
             novaPoshta.postpaid = 'Payment control'
@@ -646,12 +641,12 @@ const orderWizard = new Scenes.WizardScene(
 
         // Build clean product name with selected variants (no JSON data)
         let productDisplayName = product.name
-        
+
         // Remove any JSON data that might be in the product name
         if (productDisplayName.includes('({"colors"')) {
           productDisplayName = productDisplayName.split('({"colors"')[0].trim()
         }
-        
+
         // Add selected variants
         const variants = []
         if (ctx.scene.state.selectedColor) {
@@ -664,7 +659,7 @@ const orderWizard = new Scenes.WizardScene(
           productDisplayName += ` - ${variants.join(', ')}`
         }
 
-        // Submit to CRM with Nova Poshta data  
+        // Submit to CRM with Nova Poshta data
         const crmResult = await crmService.createOrder({
           telegramOrderId: ctx.from.id.toString(), // Use Telegram user ID instead
           products: [{
@@ -694,8 +689,8 @@ const orderWizard = new Scenes.WizardScene(
 
           await ctx.editMessageText(
             '✅ Замовлення успішно оформлено!\n\n' +
-            `📋 Номер замовлення: ${crmResult.orderId}\n` +
-            '📱 Наш менеджер зв\'яжеться з вами найближчим часом.\n\n' +
+            `📋 Номер замовлення: #${crmResult.data.data.orderId}\n` +
+            '❤️ Наш менеджер зв\'яжеться з вами найближчим часом.\n\n' +
             'Дякуємо за покупку! 🙏',
             Markup.inlineKeyboard([
               [Markup.button.callback('🏠 Головне меню', 'main_menu')]

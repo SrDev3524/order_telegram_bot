@@ -47,7 +47,7 @@ function initializeBot(bot) {
     if (ctx.session.supportMessage) {
       return
     }
-    
+
     if (ctx.session.__scenes?.current && !ctx.scene?.state?.completed) {
       return
     }
@@ -63,8 +63,6 @@ function initializeBot(bot) {
 
         const keyboard = aiService.createRecommendationKeyboard(aiResponse.recommendedProducts)
         await ctx.reply(aiResponse.text, keyboard)
-        
-        ctx.session.aiSearchMode = false
       } catch (error) {
         console.error('Error in AI consultation:', error)
         await ctx.reply(`❌ Вибачте, виникла помилка з AI помічником.
@@ -77,7 +75,7 @@ function initializeBot(bot) {
 
     await ctx.reply(`📝 Дякуємо за повідомлення!
 
-Щоб переглянути товари або використати AI помічник, натисніть 🛍 Browse Products.
+Щоб переглянути товари або використати AI помічник, натисніть 🛍 Переглянути товари.
 Для повернення до головного меню використайте /start`)
   })
 

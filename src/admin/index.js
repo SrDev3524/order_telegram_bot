@@ -30,14 +30,14 @@ app.use('/admin/settings', authMiddleware, require('./routes/settings'))
 
 const { handleCRMWebhook } = require('../webhooks/crmWebhook')
 
-app.post('/webhook/crm', async (req, res) => {
+app.post('/webhook/crm', async(req, res) => {
   console.log('CRM webhook received:', req.body)
-  
+
   try {
     if (!botInstance) {
       return res.status(503).json({ success: false, message: 'Bot not initialized' })
     }
-    
+
     const result = await handleCRMWebhook(botInstance, req.body)
     res.json(result)
   } catch (error) {
@@ -45,7 +45,6 @@ app.post('/webhook/crm', async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error' })
   }
 })
-
 
 app.setBotInstance = (bot) => {
   botInstance = bot
@@ -59,6 +58,5 @@ app.get('/', (req, res) => {
     res.redirect('/auth/login')
   }
 })
-
 
 module.exports = app
