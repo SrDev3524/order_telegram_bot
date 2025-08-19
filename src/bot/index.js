@@ -61,6 +61,9 @@ function initializeBot(bot) {
           ctx.user.id
         )
 
+        // Store recommended products in session for later viewing
+        ctx.session.lastAiRecommendations = aiResponse.recommendedProducts
+
         const keyboard = aiService.createRecommendationKeyboard(aiResponse.recommendedProducts)
         await ctx.reply(aiResponse.text, keyboard)
       } catch (error) {

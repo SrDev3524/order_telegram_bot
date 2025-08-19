@@ -232,45 +232,105 @@ const orderWizard = new Scenes.WizardScene(
     ctx.scene.state.customerName = `${ctx.scene.state.customerFirstName} ${ctx.scene.state.customerLastName}`
 
     await ctx.reply(
-      '📱 Введіть ваш номер телефону:\n(наприклад: +380501234567)',
-      Markup.inlineKeyboard([
-        [Markup.button.callback('❌ Скасувати', 'cancel_order')]
-      ])
+      '📱 Для оформлення замовлення потрібен ваш номер телефону.\n\n' +
+      '🔒 Ваші персональні дані захищені та використовуються лише для обробки замовлення.',
+      Markup.keyboard([
+        [Markup.button.contactRequest('📞 Поділитися номером телефону')],
+        ['✍️ Ввести номер вручну'],
+        ['❌ Скасувати замовлення']
+      ]).resize()
     )
 
     return ctx.wizard.next()
   },
 
-  // Step 6: Delivery method (Nova Poshta city)
+  // Step 6: Handle phone number (contact or manual input)
   async(ctx) => {
     // Reset timeout on user activity
     setOrderTimeout(ctx)
 
-    if (!ctx.message?.text) {
-      await ctx.reply('❌ Будь ласка, введіть номер телефону.')
+    // Handle contact sharing (Share Phone Number button)
+    if (ctx.message?.contact) {
+      ctx.scene.state.customerPhone = ctx.message.contact.phone_number
+      
+      await ctx.reply(
+        '✅ Номер телефону отримано!\n\n' +
+        '📦 Доставка через Нова Пошта\n\nВведіть назву вашого міста:',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('❌ Скасувати', 'cancel_order')]
+        ])
+      )
+
+      // Set delivery method and city input mode
+      ctx.scene.state.deliveryMethod = 'Нова Пошта'
+      ctx.scene.state.waitingForCity = true
+
+      return ctx.wizard.next()
+    }
+
+    // Handle manual input option
+    if (ctx.message?.text === '✍️ Ввести номер вручну') {
+      await ctx.reply(
+        '📱 Введіть ваш номер телефону:\n(наприклад: +380501234567)',
+        Markup.keyboard([
+          ['❌ Скасувати замовлення']
+        ]).resize()
+      )
+      ctx.scene.state.waitingForManualPhone = true
       return
     }
 
-    const phone = ctx.message.text.trim()
-    if (!/^\+?3?8?0\d{9}$/.test(phone.replace(/[-\s()]/g, ''))) {
-      await ctx.reply('❌ Неправильний формат телефону. Спробуйте ще раз:\n(наприклад: +380501234567)')
-      return
+    // Handle cancel from keyboard
+    if (ctx.message?.text === '❌ Скасувати замовлення') {
+      clearAllTimeouts(ctx)
+      await ctx.reply('❌ Замовлення скасовано.')
+      return ctx.scene.leave()
     }
 
-    ctx.scene.state.customerPhone = phone
+    // Handle manual phone number input
+    if (ctx.scene.state.waitingForManualPhone && ctx.message?.text) {
+      const phone = ctx.message.text.trim()
+      
+      if (phone === '❌ Скасувати замовлення') {
+        clearAllTimeouts(ctx)
+        await ctx.reply('❌ Замовлення скасовано.')
+        return ctx.scene.leave()
+      }
 
-    await ctx.reply(
-      '📦 Доставка через Нова Пошта\n\nВведіть назву вашого міста:',
-      Markup.inlineKeyboard([
-        [Markup.button.callback('❌ Скасувати', 'cancel_order')]
-      ])
-    )
+      if (!/^\+?3?8?0\d{9}$/.test(phone.replace(/[-\s()]/g, ''))) {
+        await ctx.reply('❌ Неправильний формат телефону. Спробуйте ще раз:\n(наприклад: +380501234567)')
+        return
+      }
 
-    // Set delivery method and city input mode directly
-    ctx.scene.state.deliveryMethod = 'Нова Пошта'
-    ctx.scene.state.waitingForCity = true
+      ctx.scene.state.customerPhone = phone
+      ctx.scene.state.waitingForManualPhone = false
 
-    return ctx.wizard.next()
+      await ctx.reply(
+        '✅ Номер телефону збережено!\n\n' +
+        '📦 Доставка через Нова Пошта\n\nВведіть назву вашого міста:',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('❌ Скасувати', 'cancel_order')]
+        ])
+      )
+
+      // Set delivery method and city input mode
+      ctx.scene.state.deliveryMethod = 'Нова Пошта'
+      ctx.scene.state.waitingForCity = true
+
+      return ctx.wizard.next()
+    }
+
+    // If no valid input received, prompt again
+    if (!ctx.scene.state.waitingForManualPhone) {
+      await ctx.reply(
+        '❌ Будь ласка, оберіть спосіб надання номера телефону:',
+        Markup.keyboard([
+          [Markup.button.contactRequest('📞 Поділитися номером телефону')],
+          ['✍️ Ввести номер вручну'],
+          ['❌ Скасувати замовлення']
+        ]).resize()
+      )
+    }
   },
 
   // Step 7: Handle Nova Poshta city search and warehouse selection

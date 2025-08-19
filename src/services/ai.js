@@ -603,7 +603,7 @@ ${catalogSummary}
     }
 
     buttons.push([
-      { text: '🛍 Переглянути всі товари', callback_data: 'browse_products' },
+      { text: '📋 Переглянути всі рекомендації', callback_data: 'view_ai_recommendations' },
       { text: '🏠 Головне меню', callback_data: 'main_menu' }
     ])
 
